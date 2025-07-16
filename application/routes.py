@@ -28,7 +28,7 @@ def user_home():
         "password": current_user.password
     })
 
-#create_user
+#create_user    
 @app.route('/api/register', methods=['POST'])
 def register_user():
     credentials = request.get_json()
@@ -36,4 +36,4 @@ def register_user():
         app.security.datastore.create_user(email=credentials['email'] ,uname=['username'] , password=hash_password(credentials['password']), roles = ['user'])
         db.session.commit()
         return jsonify({"message": "User registered successfully"}), 201
-    return jsonify({"message": "User already exists"}), 400
+    return jsonify({"message": "User already exists"}), 400 

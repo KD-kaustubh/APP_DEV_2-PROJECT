@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Vehicle Parking - Login</title>
+  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+
+  <div id="app" class="container mt-5">
+    <div class="row justify-content-center">
+      <div class="col-md-6">
+        <div class="card shadow p-4">
+          <h2 class="mb-4 text-center text-primary">Vehicle Parking Login</h2>
+
+          <!-- Login Section -->
+          <div v-if="!showRegister">
+            <div class="mb-3">
+              <input type="email" class="form-control" v-model="email" placeholder="Email" required>
+            </div>
+
+            <div class="mb-3">
+              <input type="password" class="form-control" v-model="password" placeholder="Password" required>
+            </div>
+
+            <button class="btn btn-primary w-100" :disabled="loading" @click="login">
+              <span v-if="loading" class="spinner-border spinner-border-sm me-2"></span>
+              Login
+            </button>
+
+            <p class="mt-3 text-center text-muted">
+              Don’t have an account?
+              <a href="#" @click.prevent="showRegister = true">Register here</a>
+            </p>
+          </div>
+
+          <!-- Register Section -->
+          <div v-else>
+            <h4 class="text-center text-success">Register</h4>
+
+            <div class="mb-3">
+              <input type="text" class="form-control" v-model="regUsername" placeholder="Username" required>
+            </div>
+            <div class="mb-3">
+              <input type="email" class="form-control" v-model="regEmail" placeholder="Email" required>
+            </div>
+            <div class="mb-3">
+              <input type="password" class="form-control" v-model="regPassword" placeholder="Password" required>
+            </div>
+
+            <button class="btn btn-success w-100" :disabled="loading" @click="register">
+              <span v-if="loading" class="spinner-border spinner-border-sm me-2"></span>
+              Register
+            </button>
+
+            <p class="mt-3 text-center text-muted">
+              Already have an account?
+              <a href="#" @click.prevent="showRegister = false">Back to login</a>
+            </p>
+          </div>
+
+          <!-- Feedback Message -->
+          <div v-if="message" class="alert mt-4" :class="{'alert-danger': isError, 'alert-success': !isError}">
+            {{ message }}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const { createApp } = Vue;
+
+    createApp({
+      data() {
+        return {
+          email: '',
+          password: '',
+          regUsername: '',
+          regEmail: '',
+          regPassword: '',
+          loading: false,
+          message: '',
+          isError: false,
+          showRegister: false
+        };
+      },
+      methods: {
+        async login() {
+          this.resetFeedback();
+          this.loading = true;
+
+          try {
+            const res = await fetch('/login', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ email: this.email, password: this.password })
+            });
+
+            const data = await res.json();
+
+            if (res.ok) {
+              const token = data.response.user.authentication_token;
+              localStorage.setItem('token', token);
+
+              const roles = data.response.user.roles;
+              window.location.href = roles.includes('admin') ? 'admin_dashboard.html' : 'user_dashboard.html';
+            } else {
+              this.isError = true;
+              this.message = data.message || 'Login failed';
+            }
+          } catch (err) {
+            this.isError = true;
+            this.message = 'Error connecting to server.';
+          } finally {
+            this.loading = false;
+          }
+        },
+
+        async register() {
+          this.resetFeedback();
+          this.loading = true;
+
+          try {
+            const res = await fetch('/api/register', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                email: this.regEmail,
+                username: this.regUsername,
+                password: this.regPassword
+              })
+            });
+
+            const result = await res.json();
+
+            if (res.ok) {
+              this.message = result.message || 'Registration successful!';
+              this.isError = false;
+              this.showRegister = false;
+            } else {
+              this.message = result.message || 'Registration failed';
+              this.isError = true;
+            }
+          } catch (err) {
+            this.isError = true;
+            this.message = 'Error connecting to server.';
+          } finally {
+            this.loading = false;
+          }
+        },
+
+        resetFeedback() {
+          this.message = '';
+          this.isError = false;
+        }
+      }
+    }).mount('#app');
+  </script>
+</body>
+</html>
