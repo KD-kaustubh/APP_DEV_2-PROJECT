@@ -1,11 +1,11 @@
-from flask import current_app as app, jsonify, request
+from flask import current_app as app, jsonify, request, render_template
 from application.database import db
 from flask_security import auth_required ,roles_required, current_user, hash_password
 
 
 @app.route('/', methods=['GET'])
 def home():
-    return "Welcome to the Parking Management System!"
+    return render_template('index.html')
 
 #ADMIN
 @app.route('/api/admin/dashboard')
@@ -25,7 +25,7 @@ def user_home():
     return jsonify({
         "username": current_user.uname,
         "email": current_user.email,
-        "password": current_user.password
+
     })
 
 #create_user    
