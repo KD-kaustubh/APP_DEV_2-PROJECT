@@ -8,32 +8,17 @@ def home():
     return render_template('index.html')
 
 #ADMIN
-@app.route('/api/admin/dashboard')
+@app.route('/admin/dashboard')
 @auth_required('token')  # Ensure only admin users can access this route
 @roles_required('admin')  # Ensure only users with the 'admin' role can access this route
 def admin_home():
-    return jsonify({
-        "message": "Welcome to the Admin Dashboard!"
-    })
+    return render_template('admin_dashboard.html')
 
 #USER
-@app.route('/api/user/dashboard')
+@app.route('/user/dashboard')
 @auth_required('token')  # Ensure only authenticated users can access this route
 @roles_required('user')  # Ensure only users with the 'user' role can access this route
 def user_home():
     user= current_user
-    return jsonify({
-        "username": current_user.uname,
-        "email": current_user.email,
+    return render_template('user_dashboard.html')
 
-    })
-
-#create_user    
-@app.route('/api/register', methods=['POST'])
-def register_user():
-    credentials = request.get_json()
-    if not app.security.datastore.find_user(email=credentials['email']):
-        app.security.datastore.create_user(email=credentials['email'] ,uname=['username'] , password=hash_password(credentials['password']), roles = ['user'])
-        db.session.commit()
-        return jsonify({"message": "User registered successfully"}), 201
-    return jsonify({"message": "User already exists"}), 400 

@@ -3,7 +3,8 @@ from flask_restful import Api, Resource
 from flask import current_app as app, jsonify, request
 from .models import User, Role, ParkingLot, ParkingSpot, Reservation, Payment, ActivityReport
 from application.database import db
-from flask_security import auth_required, roles_required, current_user, hash_password
+from flask_security import auth_required, roles_required, current_user, hash_password, verify_and_update_password, login_user
+from flask_security.utils import get_token
 from datetime import datetime, timezone
 from sqlalchemy.orm import subqueryload, joinedload
 import logging
@@ -16,6 +17,30 @@ api = Api(prefix='/api')
 
 def roles_list(roles):
     return [role.name for role in roles]
+
+
+class Login(Resource):
+    def post(self):
+        data = request.get_json()
+        email = data.get('email')
+        password = data.get('password')
+
+        user = app.security.datastore.find_user(email=email)
+        if user and verify_and_update_password(password, user):
+            login_user(user)
+            token = get_token(user)
+            return {
+                "response": {
+                    "user": {
+                        "email": user.email,
+                        "roles": roles_list(user.roles),
+                        "authentication_token": token
+                    }
+                }
+            }, 200
+        return {"message": "Invalid email or password"}, 401
+
+api.add_resource(Login, '/login')
 
 # --- Authentication & Dashboard Resources ---
 
@@ -285,3 +310,5 @@ class UserReservations(Resource):
         return {'reservations': result}, 200
 
 api.add_resource(UserReservations, '/user/reservations')
+
+
