@@ -10,7 +10,7 @@ def create_app():
     app.config.from_object(LocalDevelopmentConfig)
     db.init_app(app)
     datastore= SQLAlchemyUserDatastore(db, User, Role)
-    app.security = Security(app, datastore)
+    app.security = Security(app, datastore, register_blueprint=False)
     app.app_context().push()
     return app
 

@@ -28,6 +28,7 @@ export default {
     methods: {
         handleLogin() {
             // Replace this with your actual login logic or API call
+            console.log('ad c hai');
             console.log('Login attempted with', this.email, this.password);
             alert(`Login attempted:\nEmail: ${this.email}\nPassword: ${this.password}`);
         }

@@ -1,10 +1,10 @@
-import Home from '../components/Home.js';
+import Home from './components/home.js';
 import Login from './components/Login.js';
-import Register from '/components/Register.js';
-import Navbar from '/components/Navbar.js';
-import Foot from '/components/Footer.js';
+import Register from './components/Register.js';
+import Navbar from './components/Navbar.js';
+import Foot from './components/Footer.js';
 
-const { createRouter, createWebHistory } = VueRouter;
+const { createRouter, createWebHashHistory } = VueRouter;
 
 const routes = [
     { path: '/', component: Home },
@@ -13,8 +13,8 @@ const routes = [
 ];
 
 const router = createRouter({
-    history: createWebHistory(),
-    routes
+    history: createWebHashHistory(),
+    routes: routes
 });
 
 const app = Vue.createApp({
@@ -24,15 +24,10 @@ const app = Vue.createApp({
             <router-view></router-view>
             <foot></foot>
         </div>
-    `,
-    components: {
-        'nav-bar': Navbar,
-        'foot': Foot
-    }
+    `
 });
 
-// Use the router
+app.component('nav-bar', Navbar);
+app.component('foot', Foot);
 app.use(router);
-
-// Mount the app
 app.mount('#app');

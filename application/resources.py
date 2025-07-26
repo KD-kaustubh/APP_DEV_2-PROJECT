@@ -40,7 +40,7 @@ class Login(Resource):
             }, 200
         return {"message": "Invalid email or password"}, 401
 
-api.add_resource(Login, '/login')
+api.add_resource(Login, '/loginn')
 
 # --- Authentication & Dashboard Resources ---
 
