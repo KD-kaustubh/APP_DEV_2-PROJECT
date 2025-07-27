@@ -2,8 +2,9 @@ from flask import Flask
 from application.database import db
 from application.models import User, Role, UsersRoles
 from application.config import LocalDevelopmentConfig
-from flask_security import Security, SQLAlchemyUserDatastore
-from flask_security import hash_password
+from flask_security import Security, SQLAlchemyUserDatastore,hash_password
+from application.resources import api
+from application.routes import main_bp
 
 def create_app():
     app = Flask(__name__)
@@ -12,9 +13,11 @@ def create_app():
     datastore= SQLAlchemyUserDatastore(db, User, Role)
     app.security = Security(app, datastore, register_blueprint=False)
     app.app_context().push()
+    app.register_blueprint(main_bp)
     return app
 
 app = create_app()
+api.init_app(app)
 
 with app.app_context():
     db.create_all()

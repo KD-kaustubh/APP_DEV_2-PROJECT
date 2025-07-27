@@ -4,7 +4,6 @@ from flask import current_app as app, jsonify, request
 from .models import User, Role, ParkingLot, ParkingSpot, Reservation, Payment, ActivityReport
 from application.database import db
 from flask_security import auth_required, roles_required, current_user, hash_password, verify_and_update_password, login_user
-from flask_security.utils import get_token
 from datetime import datetime, timezone
 from sqlalchemy.orm import subqueryload, joinedload
 import logging
@@ -21,76 +20,85 @@ def roles_list(roles):
 
 class Login(Resource):
     def post(self):
-        data = request.get_json()
-        email = data.get('email')
-        password = data.get('password')
-
-        user = app.security.datastore.find_user(email=email)
-        if user and verify_and_update_password(password, user):
-            login_user(user)
-            token = get_token(user)
-            return {
-                "response": {
-                    "user": {
-                        "email": user.email,
-                        "roles": roles_list(user.roles),
-                        "authentication_token": token
-                    }
-                }
-            }, 200
-        return {"message": "Invalid email or password"}, 401
-
-api.add_resource(Login, '/loginn')
-
-# --- Authentication & Dashboard Resources ---
-
-class UserDashboard(Resource):
-    @auth_required('token')
-    @roles_required('user')
-    def get(self):
-        return {
-            'username': current_user.uname,
-            'email': current_user.email,
-            'roles': roles_list(current_user.roles)
-        }, 200
-    
-class AdminDashboard(Resource):
-    @auth_required('token')
-    @roles_required('admin')
-    def get(self):
-        return {
-            'message': 'Welcome to the Admin Dashboard!',
-            'username': current_user.uname,
-            'email': current_user.email,
-            'roles': roles_list(current_user.roles)
-        }, 200
-
-class RegisterUser(Resource):
-    def post(self):
-        credentials = request.get_json()
-        if not credentials or not all(k in credentials for k in ('email', 'username', 'password')):
-            return {"message": "Missing email, username, or password"}, 400
-
-        if app.security.datastore.find_user(email=credentials['email']):
-            return {"message": "User with this email already exists"}, 409 # 409 Conflict is more specific
-
         try:
-            app.security.datastore.create_user(
-                email=credentials['email'],
-                uname=credentials['username'],
-                password=hash_password(credentials['password']),
-                roles=['user']
-            )
-            db.session.commit()
-            return {"message": "User registered successfully"}, 201
-        except Exception as e:
-            db.session.rollback()
-            logger.error(f"Error creating user: {e}")
-            return {"message": "Could not create user due to an internal error."}, 500
+            data = request.get_json()
+            email = data.get('email')
+            password = data.get('password')
 
-api.add_resource(UserDashboard, '/user/dashboard')
-api.add_resource(AdminDashboard, '/admin/dashboard')
-api.add_resource(RegisterUser, '/register')
+            if not email or not password:
+                return {"message": "Email and password are required"}, 400
+
+            user = app.security.datastore.find_user(email=email)
+            if user and verify_and_update_password(password, user):
+                login_user(user)
+                token = user.get_auth_token()
+                return {
+                    "response": {
+                        "user": {
+                            "email": user.email,
+                            "roles": roles_list(user.roles),
+                            "authentication_token": token
+                        }
+                    }
+                }, 200
+
+            return {"message": "Invalid email or password"}, 401
+
+        except Exception as e:
+            logger.error(f"Login error: {e}", exc_info=True)
+            return {"message": "Internal server error"}, 500
+
+api.add_resource(Login, '/login')
+
+# # --- Authentication & Dashboard Resources ---
+
+# class UserDashboard(Resource):
+#     @auth_required('token')
+#     @roles_required('user')
+#     def get(self):
+#         return {
+#             'username': current_user.uname,
+#             'email': current_user.email,
+#             'roles': roles_list(current_user.roles)
+#         }, 200
+    
+# class AdminDashboard(Resource):
+#     @auth_required('token')
+#     @roles_required('admin')
+#     def get(self):
+#         return {
+#             'message': 'Welcome to the Admin Dashboard!',
+#             'username': current_user.uname,
+#             'email': current_user.email,
+#             'roles': roles_list(current_user.roles)
+#         }, 200
+
+# class RegisterUser(Resource):
+#     def post(self):
+#         credentials = request.get_json()
+#         if not credentials or not all(k in credentials for k in ('email', 'username', 'password')):
+#             return {"message": "Missing email, username, or password"}, 400
+
+#         if app.security.datastore.find_user(email=credentials['email']):
+#             return {"message": "User with this email already exists"}, 409 # 409 Conflict is more specific
+
+#         try:
+#             app.security.datastore.create_user(
+#                 email=credentials['email'],
+#                 uname=credentials['username'],
+#                 password=hash_password(credentials['password']),
+#                 roles=['user']
+#             )
+#             db.session.commit()
+#             return {"message": "User registered successfully"}, 201
+#         except Exception as e:
+#             db.session.rollback()
+#             logger.error(f"Error creating user: {e}")
+#             return {"message": "Could not create user due to an internal error."}, 500
+
+# api.add_resource(UserDashboard, '/user/dashboard')
+# api.add_resource(AdminDashboard, '/admin/dashboard')
+# api.add_resource(RegisterUser, '/register')
 
 
 # --- Admin Parking Lot Management ---
