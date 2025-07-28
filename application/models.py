@@ -1,6 +1,6 @@
 from .database import db
 from flask_security import UserMixin, RoleMixin
-from datetime import datetime
+from datetime import datetime, timezone
 
 class User(db.Model,UserMixin):
     __tablename__ = 'user'
@@ -56,8 +56,9 @@ class Reservation(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     spot_id = db.Column(db.Integer, db.ForeignKey('parking_spot.id'), nullable=False)
-    
-    parking_timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+
+    vehicle_number = db.Column(db.String(20), nullable=False)
+    parking_timestamp = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     leaving_timestamp = db.Column(db.DateTime, nullable=True)
     parking_cost = db.Column(db.Float, nullable=True)
     remarks = db.Column(db.Text, nullable=True)
@@ -69,8 +70,8 @@ class Payment(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
 
     amount = db.Column(db.Float, nullable=False)
-    status = db.Column(db.String(20), default='Pending')  # Pending, Success, Failed
-    payment_time = db.Column(db.DateTime, default=datetime.utcnow)
+    status = db.Column(db.String(20), default='Pending')  
+    payment_time = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
     reservation = db.relationship('Reservation', backref='payment')
     user = db.relationship('User', backref='payments')

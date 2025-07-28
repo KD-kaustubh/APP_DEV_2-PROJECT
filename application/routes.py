@@ -11,7 +11,7 @@ def home():
 
 @main_bp.route('/api/home')
 @auth_required('token')
-@roles_required('user')
+@roles_required('user', 'admin')
 def user_home():
     user = current_user
     return jsonify({

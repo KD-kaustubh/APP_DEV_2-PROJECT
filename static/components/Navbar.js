@@ -11,18 +11,75 @@ export default {
 
                 <div class="collapse navbar-collapse" id="navbarNav">
                     <ul class="navbar-nav ms-auto">
-                        <li class="nav-item">
+                        <!-- Show Home ONLY if NOT logged in -->
+                        <li v-if="!isLoggedIn" class="nav-item">
                             <router-link class="nav-link" to="/">Home</router-link>
                         </li>
-                        <li class="nav-item">
-                            <router-link class="nav-link" to="/login">Login</router-link>
+
+                        <!-- Show Dashboard link ONLY if logged in -->
+                        <li v-if="isLoggedIn" class="nav-item">
+                            <router-link class="nav-link" to="/dashboard">Dashboard</router-link>
                         </li>
-                        <li class="nav-item">
-                            <router-link class="nav-link" to="/register">Register</router-link>
+
+                        <!-- Show Login/Register ONLY if NOT logged in -->
+                        <template v-if="!isLoggedIn">
+                            <li class="nav-item">
+                                <router-link class="nav-link" to="/login">Login</router-link>
+                            </li>
+                            <li class="nav-item">
+                                <router-link class="nav-link" to="/register">Register</router-link>
+                            </li>
+                        </template>
+
+                        <!-- Show Logout button ONLY if logged in -->
+                        <li v-if="isLoggedIn" class="nav-item">
+                            <a class="nav-link" href="#" @click.prevent="logout" style="cursor: pointer;">Logout</a>
                         </li>
+
+                        <!-- Show Users link ONLY if logged in and is an admin -->
+                        <li v-if="isLoggedIn && isAdmin" class="nav-item">
+                            <router-link class="nav-link" to="/users">Users</router-link>
+                        </li>
+
                     </ul>
                 </div>
             </div>
         </nav>
-    `
+    `,
+    data() {
+        return {
+            isLoggedIn: false,
+        };
+    },
+    methods: {
+        logout() {
+            // Remove all user data from sessionStorage
+            sessionStorage.removeItem('auth_token');
+            sessionStorage.removeItem('user_email');
+            sessionStorage.removeItem('user_roles');
+            this.updateLoginState();
+            this.$router.replace('/login'); // Use replace for better UX
+        },
+        updateLoginState() {
+            // The navbar is "logged in" if the auth_token exists in sessionStorage
+            this.isLoggedIn = !!sessionStorage.getItem('auth_token');
+        },
+    },
+    computed: {
+        isAdmin() {
+            const roles = JSON.parse(sessionStorage.getItem('user_roles') || '[]');
+            return roles.includes('admin');
+        }
+    },
+    mounted() {
+        // Check login state when the component is first created
+        this.updateLoginState();
+    },
+    watch: {
+        // Watch for changes in the route (i.e., when user navigates)
+        '$route'() {
+            // Re-check the login state every time the page changes
+            this.updateLoginState();
+        }
+    }
 };

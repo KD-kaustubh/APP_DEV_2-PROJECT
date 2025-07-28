@@ -4,6 +4,7 @@ import Register from './components/Register.js';
 import Navbar from './components/Navbar.js';
 import Foot from './components/Footer.js';
 import Dashboard from './components/Dashboard.js';
+import UsersList from './components/UsersList.js';
 
 const { createRouter, createWebHashHistory } = VueRouter;
 
@@ -12,6 +13,7 @@ const routes = [
     { path: '/login', component: Login },
     { path: '/register', component: Register },
     { path: '/dashboard', component: Dashboard },
+    { path: '/users', component: UsersList },
 ];
 
 const router = createRouter({
@@ -37,4 +39,4 @@ const app = Vue.createApp({
 app.component('nav-bar', Navbar);
 app.component('foot', Foot);
 app.use(router);
-app.mount('#app'); 
+app.mount('#app');

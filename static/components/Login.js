@@ -66,7 +66,11 @@ export default {
 
       if (res.ok) {
         //token save in localstorage
-        localStorage.setItem("auth_token", data.response.user.authentication_token);
+        sessionStorage.setItem("auth_token", data.response.user.authentication_token);
+        sessionStorage.setItem("user_email", data.response.user.email);
+        sessionStorage.setItem("user_roles", JSON.stringify(data.response.user.roles));
+        sessionStorage.setItem("user_uname", data.response.user.uname);
+        // ------------------------------------
 
         alert(`Welcome back, ${data.response.user.email}!`);
 
