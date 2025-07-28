@@ -4,7 +4,8 @@ from flask import current_app as app, jsonify, request
 from .models import User, Role, ParkingLot, ParkingSpot, Reservation, Payment, ActivityReport
 from application.database import db
 from flask_security import auth_required, roles_required, current_user, hash_password, verify_and_update_password, login_user
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
+IST = timezone(timedelta(hours=5, minutes=30))
 from sqlalchemy.orm import subqueryload, joinedload
 from sqlalchemy import func
 import logging
@@ -253,7 +254,7 @@ class ReserveParking(Resource):
                 # --- ADD VEHICLE NUMBER HERE ---
                 vehicle_number=vehicle_number,
                 # -------------------------------
-                parking_timestamp=datetime.now(timezone.utc),
+                parking_timestamp=datetime.now(IST),
                 parking_cost=lot.price
             )
             db.session.add(reservation)
@@ -295,9 +296,9 @@ class VacateParking(Resource):
             return {'message': f'Associated parking lot for spot {spot.id} not found.'}, 404
 
         try:
-            now = datetime.now(timezone.utc)
+            now = datetime.now(IST)
             if active_reservation.parking_timestamp.tzinfo is None:
-                active_reservation.parking_timestamp = active_reservation.parking_timestamp.replace(tzinfo=timezone.utc)
+                active_reservation.parking_timestamp = active_reservation.parking_timestamp.replace(tzinfo=IST)
             duration = now - active_reservation.parking_timestamp
             hours = duration.total_seconds() / 3600
 
@@ -470,8 +471,6 @@ class AdminUsers(Resource):
 
 api.add_resource(AdminUsers, '/admin/users')
 
-# In application/resources.py
-# Add these new resources anywhere before the api.add_resource calls
 
 class AdminSpotDetails(Resource):
     @auth_required('token')

@@ -30,7 +30,8 @@ export default {
                                 <td>
                                     <button class="btn btn-sm btn-info me-2" @click="showEditForm(lot)">Edit</button>
                                     <button class="btn btn-sm btn-danger me-2" @click="deleteLot(lot.id)">Delete</button>
-                                    <button class="btn btn-sm btn-secondary" @click="showLotDetails(lot)">View</button>
+                                    <button class="btn btn-sm btn-secondary me-2" @click="showLotDetails(lot)">Details</button>
+                                    <button class="btn btn-sm btn-warning" @click="viewSpots(lot)">View Spots</button>
                                 </td>
                             </tr>
                         </tbody>
@@ -97,6 +98,31 @@ export default {
                         </div>
                     </div>
                 </div>
+
+                <!-- New Section: All Registered Users -->
+                <div v-if="userRole === 'admin' && showView === 'view_lots'">
+                    <h3 class="mt-5">All Registered Users</h3>
+                    <table class="table table-bordered">
+                        <thead>
+                          <tr>
+                            <th>#</th>
+                            <th>Email</th>
+                            <th>Name</th>
+                            <th>Current Spot</th>
+                            <th>Status</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr v-for="(user, index) in allUsers" :key="user.id">
+                            <td>{{ index + 1 }}</td>
+                            <td>{{ user.email }}</td>
+                            <td>{{ user.uname }}</td>
+                            <td>{{ user.current_spot || '-' }}</td>
+                            <td>{{ user.status }}</td>
+                          </tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
             
         </div>
@@ -149,7 +175,10 @@ export default {
                 </table>
 
                 <h3 class="mt-5">Available Parking Lots</h3>
-                <table class="table">
+                <div v-if="lots.length === 0" class="alert alert-warning">
+                    No parking lots available at the moment. Please check back later.
+                </div>
+                <table v-else class="table">
                     <thead><tr><th>Location</th><th>Price (per hr)</th><th>Available Spots</th><th>Action</th></tr></thead>
                     <tbody>
                         <tr v-for="lot in lots" :key="lot.id">
@@ -160,6 +189,7 @@ export default {
                                 <button class="btn btn-success" :disabled="lot.available_spots === 0 || hasActiveBooking" @click="openBookingModal(lot.id)">
                                     Book Now
                                 </button>
+                                <button class="btn btn-info ms-2" @click="showLotDetails(lot)">Details</button>
                             </td>
                         </tr>
                     </tbody>
@@ -229,6 +259,46 @@ export default {
             </div>
           </div>
         </div>
+
+        <!-- #################### VIEW SPOTS MODAL #################### -->
+        <div class="modal fade" id="spotsModal" tabindex="-1" aria-labelledby="spotsModalLabel" aria-hidden="true">
+          <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+              <div class="modal-header">
+                <h5 class="modal-title" id="spotsModalLabel">
+                  Parking Spots for {{ spotsLotName }}
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+              </div>
+              <div class="modal-body">
+                <table class="table table-bordered">
+                  <thead>
+                    <tr>
+                      <th>Spot ID</th>
+                      <th>Status</th>
+                      <th>Vehicle Number</th>
+                      <th>User Email</th>
+                      <th>Parked Since</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="spot in lotSpots" :key="spot.id">
+                      <td>{{ spot.id }}</td>
+                      <td>
+                        <span :class="{'badge bg-success': spot.status === 'Available', 'badge bg-danger': spot.status === 'Occupied'}">
+                          {{ spot.status }}
+                        </span>
+                      </td>
+                      <td>{{ spot.vehicle_number || '-' }}</td>
+                      <td>{{ spot.user_email || '-' }}</td>
+                      <td>{{ spot.parked_since ? toIST(spot.parked_since) : '-' }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
     </div>
     `,
     data() {
@@ -258,6 +328,10 @@ export default {
             userStats: [],
             userReservationsChart: null,
             userSpentChart: null,
+            allUsers: [], // <-- Add this line
+            lotSpots: [],
+            spotsLotName: '',
+            spotsModal: null,
         };
     },
     computed: {
@@ -385,6 +459,14 @@ export default {
             } catch (error) {
                 console.error("Failed to vacate spot:", error);
             }
+        },
+        openViewSpotsModal(lotName, spots) {
+            this.spotsLotName = lotName;
+            this.lotSpots = spots;
+            if (!this.spotsModal) {
+                this.spotsModal = new bootstrap.Modal(document.getElementById('spotsModal'));
+            }
+            this.spotsModal.show();
         },
         async fetchInitialUserData() {
             // This function will get all necessary data for the user dashboard at once.
@@ -541,6 +623,27 @@ export default {
                 }
             });
         },
+        async fetchAllUsers() {
+            try {
+                const data = await this.apiFetch('/api/admin/users');
+                this.allUsers = data.users;
+            } catch (error) {
+                console.error("Failed to fetch users:", error);
+            }
+        },
+        async viewSpots(lot) {
+            try {
+                const data = await this.apiFetch(`/api/admin/parking-lots/${lot.id}/spots`);
+                this.lotSpots = data.spots;
+                this.spotsLotName = lot.location;
+                if (!this.spotsModal) {
+                    this.spotsModal = new bootstrap.Modal(document.getElementById('spotsModal'));
+                }
+                this.spotsModal.show();
+            } catch (error) {
+                alert("Failed to fetch spot details.");
+            }
+        },
     },
     async mounted() {
         if (!this.authToken) { this.$router.push('/login'); return; }
@@ -549,6 +652,7 @@ export default {
 
         if (this.userRole === 'admin') {
             await this.fetchLots();
+            await this.fetchAllUsers(); // <-- Add this line
             this.showView = 'view_lots';
         } else {
             await this.fetchInitialUserData();

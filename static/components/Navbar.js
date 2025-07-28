@@ -16,11 +16,6 @@ export default {
                             <router-link class="nav-link" to="/">Home</router-link>
                         </li>
 
-                        <!-- Show Dashboard link ONLY if logged in -->
-                        <li v-if="isLoggedIn" class="nav-item">
-                            <router-link class="nav-link" to="/dashboard">Dashboard</router-link>
-                        </li>
-
                         <!-- Show Login/Register ONLY if NOT logged in -->
                         <template v-if="!isLoggedIn">
                             <li class="nav-item">
@@ -34,11 +29,6 @@ export default {
                         <!-- Show Logout button ONLY if logged in -->
                         <li v-if="isLoggedIn" class="nav-item">
                             <a class="nav-link" href="#" @click.prevent="logout" style="cursor: pointer;">Logout</a>
-                        </li>
-
-                        <!-- Show Users link ONLY if logged in and is an admin -->
-                        <li v-if="isLoggedIn && isAdmin" class="nav-item">
-                            <router-link class="nav-link" to="/users">Users</router-link>
                         </li>
 
                     </ul>
@@ -69,6 +59,9 @@ export default {
         isAdmin() {
             const roles = JSON.parse(sessionStorage.getItem('user_roles') || '[]');
             return roles.includes('admin');
+        },
+        isDashboard() {
+            return this.$route.path === '/dashboard';
         }
     },
     mounted() {
