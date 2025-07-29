@@ -7,7 +7,7 @@ from flask_security import auth_required, roles_required, current_user, hash_pas
 from datetime import datetime, timezone, timedelta
 IST = timezone(timedelta(hours=5, minutes=30))
 from sqlalchemy.orm import subqueryload, joinedload
-from sqlalchemy import func
+from sqlalchemy import func, extract
 import logging
 import math
 
@@ -53,56 +53,6 @@ class Login(Resource):
             return {"message": "Internal server error"}, 500
 
 api.add_resource(Login, '/login')
-
-# # --- Authentication & Dashboard Resources ---
-
-# class UserDashboard(Resource):
-#     @auth_required('token')
-#     @roles_required('user')
-#     def get(self):
-#         return {
-#             'username': current_user.uname,
-#             'email': current_user.email,
-#             'roles': roles_list(current_user.roles)
-#         }, 200
-    
-# class AdminDashboard(Resource):
-#     @auth_required('token')
-#     @roles_required('admin')
-#     def get(self):
-#         return {
-#             'message': 'Welcome to the Admin Dashboard!',
-#             'username': current_user.uname,
-#             'email': current_user.email,
-#             'roles': roles_list(current_user.roles)
-#         }, 200
-
-# class RegisterUser(Resource):
-#     def post(self):
-#         credentials = request.get_json()
-#         if not credentials or not all(k in credentials for k in ('email', 'username', 'password')):
-#             return {"message": "Missing email, username, or password"}, 400
-
-#         if app.security.datastore.find_user(email=credentials['email']):
-#             return {"message": "User with this email already exists"}, 409 # 409 Conflict is more specific
-
-#         try:
-#             app.security.datastore.create_user(
-#                 email=credentials['email'],
-#                 uname=credentials['username'],
-#                 password=hash_password(credentials['password']),
-#                 roles=['user']
-#             )
-#             db.session.commit()
-#             return {"message": "User registered successfully"}, 201
-#         except Exception as e:
-#             db.session.rollback()
-#             logger.error(f"Error creating user: {e}")
-#             return {"message": "Could not create user due to an internal error."}, 500
-
-# api.add_resource(UserDashboard, '/user/dashboard')
-# api.add_resource(AdminDashboard, '/admin/dashboard')
-# api.add_resource(RegisterUser, '/register')
 
 
 # --- Admin Parking Lot Management ---
@@ -523,7 +473,6 @@ class AdminSummary(Resource):
             'lots_breakdown': lots_data
         }, 200
 
-# Now, register these new resources at the end of your file
 api.add_resource(AdminSpotDetails, '/admin/parking-lots/<int:lot_id>/spots')
 api.add_resource(AdminSummary, '/admin/summary')
 
@@ -581,3 +530,51 @@ class AdminUserActivityAPI(Resource):
         return {'reports': result}, 200
 
 api.add_resource(AdminUserActivityAPI, '/admin/user/<int:user_id>/activity')
+
+
+class UserMonthlyLotSpending(Resource):
+    @auth_required('token')
+    @roles_required('user')
+    def get(self):
+        # Query for amount spent per lot per month
+        results = (
+            db.session.query(
+                func.strftime('%Y-%m', Reservation.parking_timestamp).label('month'),
+                ParkingLot.prime_location_name.label('lot_name'),
+                func.sum(Reservation.parking_cost).label('amount_spent'),
+                func.count(Reservation.id).label('reservations_count')
+            )
+            .join(ParkingSpot, Reservation.spot_id == ParkingSpot.id)
+            .join(ParkingLot, ParkingSpot.lot_id == ParkingLot.id)
+            .filter(
+                Reservation.user_id == current_user.id,
+                Reservation.parking_cost != None
+            )
+            .group_by('month', 'lot_name')
+            .order_by('month')
+            .all()
+        )
+
+        # Organize data per month
+        month_dict = {}
+        for row in results:
+            if row.month not in month_dict:
+                month_dict[row.month] = {'lots': [], 'total_reservations': 0}
+            month_dict[row.month]['lots'].append({
+                'lot_name': row.lot_name,
+                'amount_spent': float(row.amount_spent),
+                'reservations_count': row.reservations_count
+            })
+            month_dict[row.month]['total_reservations'] += row.reservations_count
+
+        # Format for frontend
+        response = []
+        for month, data in month_dict.items():
+            response.append({
+                'month': month,
+                'lots': data['lots'],
+                'total_reservations': data['total_reservations']
+            })
+        return {'reports': response}, 200
+
+api.add_resource(UserMonthlyLotSpending, '/user/reports-lotwise')

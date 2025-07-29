@@ -103,7 +103,7 @@ export default {
                     </div>
                 </div>
 
-                <!-- New Section: All Registered Users -->
+                <!--  All Registered Users -->
                 <div v-if="userRole === 'admin' && showView === 'view_lots'">
                     <h3 class="mt-5">All Registered Users</h3>
                     <table class="table table-bordered">
@@ -203,6 +203,21 @@ export default {
                     </tbody>
                 </table>
             </div>
+            <div v-if="selectedLot" class="card mt-3">
+                <div class="card-header">
+                    <strong>Parking Lot Details</strong>
+                    <button type="button" class="btn-close float-end" aria-label="Close" @click="selectedLot = null"></button>
+                </div>
+                <div class="card-body">
+                    <p><strong>Location:</strong> {{ selectedLot.location }}</p>
+                    <p><strong>Price:</strong> ₹{{ selectedLot.price.toFixed(2) }}</p>
+                    <p><strong>Address:</strong> {{ selectedLot.address }}</p>
+                    <p><strong>Pin Code:</strong> {{ selectedLot.pin }}</p>
+                    <p><strong>Total Spots:</strong> {{ selectedLot.total_spots }}</p>
+                    <p><strong>Available Spots:</strong> {{ selectedLot.available_spots }}</p>
+                    <p><strong>Occupied Spots:</strong> {{ selectedLot.occupied_spots }}</p>
+    </div>
+</div>
 
             <!-- #################### USER STATS VIEW #################### -->
             <div v-if="showView === 'user_stats'">
@@ -221,7 +236,7 @@ export default {
             </div>
         </div>
 
-        <!-- #################### BOOKING MODAL (New) #################### -->
+        <!-- #################### BOOKING MODAL #################### -->
         <div class="modal fade" id="bookingModal" tabindex="-1" aria-labelledby="bookingModalLabel" aria-hidden="true">
             <div class="modal-dialog">
                 <div class="modal-content">
@@ -404,10 +419,10 @@ export default {
             if (contentType && contentType.includes("application/json")) {
                 return response.json();
             }
-            return {}; // Return empty object for non-json responses (like DELETE)
+            return {}; 
         },
 
-        // --------- ADMIN METHODS (with full CRUD) ---------
+        // --------- ADMIN METHODS---------
         async fetchLots() {
             try {
                 this.lots = (await this.apiFetch('/api/admin/parking-lots')).parking_lots;
@@ -419,7 +434,6 @@ export default {
             this.showView = 'add_lot';
         },
         showEditForm(lot) {
-            // Create a copy of the lot object to avoid modifying the original list directly
             this.editLotData = { ...lot };
             this.showView = 'edit_lot';
         },
@@ -466,7 +480,7 @@ export default {
 
 
 
-        // --------- USER METHODS (Updated for Modal Flow) ---------
+        // --------- USER METHODS  ---------
         openBookingModal(lotId) {
             this.bookingLotId = lotId;
             this.vehicleNumber = '';
@@ -511,10 +525,7 @@ export default {
                 const data = await this.apiFetch('/api/user/vacate-parking', { method: 'POST' });
                 this.vacateCost = data.final_cost;
                 this.vacateTime = data.vacated_at;
-                // Instead of hiding the modal immediately, show the info and let user close
-                // Optionally, set a flag to show a "Close" button
                 this.vacateReleased = true;
-                // Optionally, refresh data
                 this.fetchInitialUserData();
             } catch (error) {
                 console.error("Failed to vacate spot:", error);
@@ -529,7 +540,6 @@ export default {
             this.spotsModal.show();
         },
         async fetchInitialUserData() {
-            // This function will get all necessary data for the user dashboard at once.
             await this.fetchUserReservations();
             await this.fetchAvailableLots();
         },
@@ -632,7 +642,7 @@ export default {
         },
         async fetchUserStats() {
             try {
-                const data = await this.apiFetch('/api/user/reports');
+                const data = await this.apiFetch('/api/user/reports-lotwise');
                 this.userStats = data.reports;
                 console.log("User stats:", this.userStats); // <-- Add this line
                 this.$nextTick(() => {
@@ -649,13 +659,12 @@ export default {
             // Convert "YYYY-MM" to "Month YYYY"
             const months = this.userStats.map(r => {
                 const [year, month] = r.month.split('-');
-                const date = new Date(year, month - 1); // JS months are 0-based
+                const date = new Date(year, month - 1);
                 return date.toLocaleString('default', { month: 'long', year: 'numeric' });
             });
-            const reservations = this.userStats.map(r => r.total_reservations);
-            const spent = this.userStats.map(r => r.total_spent);
 
-            // Reservations per Month
+            // Reservations per Month 
+            const reservations = this.userStats.map(r => r.total_reservations ?? 0);
             const resCtx = document.getElementById('userReservationsChart').getContext('2d');
             this.userReservationsChart = new Chart(resCtx, {
                 type: 'bar',
@@ -669,17 +678,33 @@ export default {
                 }
             });
 
-            // Amount Spent per Month
+            // Amount Spent per Month per Lot (bar)
+            // Collect all unique lot names
+            const lotNames = Array.from(new Set(this.userStats.flatMap(r => (r.lots || []).map(l => l.lot_name))));
+            // Build datasets for each lot
+            const datasets = lotNames.map((lot, idx) => ({
+                label: lot,
+                data: this.userStats.map(r => {
+                    const found = (r.lots || []).find(l => l.lot_name === lot);
+                    return found ? found.amount_spent : 0;
+                }),
+                backgroundColor: ['#ff6384', '#36a2eb', '#4bc0c0', '#ffcd56', '#9966ff', '#c9cbcf'][idx % 6]
+            }));
+
             const spentCtx = document.getElementById('userSpentChart').getContext('2d');
             this.userSpentChart = new Chart(spentCtx, {
                 type: 'bar',
                 data: {
                     labels: months,
-                    datasets: [{
-                        label: 'Amount Spent (₹)',
-                        data: spent,
-                        backgroundColor: '#ff6384'
-                    }]
+                    datasets: datasets
+                },
+                options: {
+                    plugins: { title: { display: true, text: 'Amount Spent per Month per Lot' } },
+                    responsive: true,
+                    scales: {
+                        x: { stacked: false },
+                        y: { stacked: false }
+                    }
                 }
             });
         },
