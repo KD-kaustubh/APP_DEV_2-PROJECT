@@ -1,7 +1,9 @@
-from flask import Blueprint, render_template, jsonify, request, current_app
+from flask import Blueprint, render_template, jsonify, request, current_app, send_from_directory
 from application.database import db
 from flask_security import auth_required, roles_required, current_user, hash_password
 from application.models import User, Role
+from celery.result import AsyncResult
+from application.task import csv_report
 
 main_bp = Blueprint('main', __name__)
 
@@ -36,5 +38,21 @@ def create_user():
         return jsonify({"message": "User registered successfully"}), 201
     return jsonify({"message": "User already exists"}), 400
 
+
+#this manually trigger the job
+@main_bp.route('/api/export', methods=['GET'])
+def export_csv():
+    result = csv_report.delay()   # async object
+    return jsonify({
+        "id": result.id,
+        "result": result.result,
+    })
+
+
+#just created to test the result
+@main_bp.route('/api/csv_result/<id>')
+def csv_result(id):
+    result = AsyncResult(id)
+    return send_from_directory('static', result.result, as_attachment=True)
 
 

@@ -5,6 +5,12 @@ from application.config import LocalDevelopmentConfig
 from flask_security import Security, SQLAlchemyUserDatastore,hash_password
 from application.resources import api
 from application.routes import main_bp
+from application.celery_init import celery_init_app
+from application import celery
+from celery.schedules import crontab
+from application.task import monthly_report
+
+
 
 def create_app():
     app = Flask(__name__)
@@ -18,6 +24,10 @@ def create_app():
 
 app = create_app()
 api.init_app(app)
+
+celery_app = celery_init_app(app)
+celery.autodiscover_tasks()
+
 
 with app.app_context():
     db.create_all()
@@ -36,6 +46,12 @@ with app.app_context():
 
 #hash pswd= bcypt(pwd,salt)
 from application.routes import *
+
+@celery.on_after_finalise.connect
+def setup_periodic_tasks(sender, **kwargs):
+    sender.add_periodic_task(
+        crontab(minute='*/2'), 
+        monthly_report.s())
 
 if __name__ == '__main__':
     app.run()

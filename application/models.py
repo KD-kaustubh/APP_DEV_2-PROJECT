@@ -87,3 +87,4 @@ class ActivityReport(db.Model):
     most_used_lot_id = db.Column(db.Integer, db.ForeignKey('parking_lot.id'), nullable=True)
 
     most_used_lot = db.relationship('ParkingLot', backref='reports')
+    last_updated = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

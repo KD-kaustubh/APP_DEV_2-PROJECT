@@ -260,6 +260,14 @@ class ReserveParking(Resource):
             db.session.add(reservation)
             db.session.commit()
 
+            # --- UPDATE ACTIVITY REPORT ---
+            update_activity_report(
+                user_id=current_user.id,
+                dt=reservation.parking_timestamp,
+                lot_id=reservation.spot.lot_id,
+                add_reservation=True
+            )
+
             return {
                 'message': 'Parking spot reserved successfully',
                 'lot_id': lot.id,
@@ -407,6 +415,15 @@ class ProcessPayment(Resource):
             db.session.add(new_payment)
             db.session.commit()
             
+            # --- UPDATE ACTIVITY REPORT ---
+            update_activity_report(
+                user_id=current_user.id,
+                dt=reservation.leaving_timestamp or reservation.parking_timestamp,
+                lot_id=reservation.spot.lot_id,
+                amount=reservation.parking_cost or 0,
+                add_spent=True
+            )
+
             return {'message': 'Payment successful!', 'payment_id': new_payment.id}, 200
         except Exception as e:
             db.session.rollback()
@@ -418,32 +435,15 @@ class UserActivityAPI(Resource):
     @auth_required('token')
     @roles_required('user')
     def get(self):
-        # Group by year and month, count reservations, sum spent
-        stats = db.session.query(
-            func.strftime('%Y-%m', Reservation.parking_timestamp).label('month'),
-            func.count(Reservation.id).label('total_reservations'),
-            func.sum(Reservation.parking_cost).label('total_spent')
-        ).filter(
-            Reservation.user_id == current_user.id
-        ).group_by(
-            func.strftime('%Y-%m', Reservation.parking_timestamp)
-        ).order_by(
-            func.strftime('%Y-%m', Reservation.parking_timestamp).desc()
-        ).all()
-
+        reports = ActivityReport.query.filter_by(user_id=current_user.id).order_by(ActivityReport.month.desc()).all()
         result = []
-        for row in stats:
+        for r in reports:
             result.append({
-                'month': row.month,
-                'total_reservations': row.total_reservations,
-                'total_spent': float(row.total_spent or 0),
-                'most_used_lot': 'N/A'  # Optional: add logic if you want
+                'month': r.month,
+                'total_reservations': r.total_reservations,
+                'total_spent': r.total_spent,
+                'most_used_lot': r.most_used_lot.prime_location_name if r.most_used_lot else 'N/A'
             })
-
-        # If no data, return a dummy row for UI
-        if not result:
-            result = [{'month': datetime.now().strftime('%Y-%m'), 'total_reservations': 0, 'total_spent': 0.0, 'most_used_lot': 'N/A'}]
-
         return {'reports': result}, 200
 
 api.add_resource(ProcessPayment, '/user/payment/<int:reservation_id>')
@@ -546,3 +546,38 @@ class AdminRevenueSummary(Resource):
         return {'lots': result}, 200
 
 api.add_resource(AdminRevenueSummary, '/admin/revenue-summary')
+
+
+def update_activity_report(user_id, dt, lot_id=None, amount=0, add_reservation=False, add_spent=False):
+    month_str = dt.strftime('%Y-%m')
+    report = ActivityReport.query.filter_by(user_id=user_id, month=month_str).first()
+    if not report:
+        report = ActivityReport(user_id=user_id, month=month_str)
+        db.session.add(report)
+    if add_reservation:
+        report.total_reservations = (report.total_reservations or 0) + 1
+    if add_spent:
+        report.total_spent = (report.total_spent or 0) + (amount or 0)
+    if lot_id:
+        report.most_used_lot_id = lot_id  # (Optional: add logic to find most used lot)
+    report.last_updated = datetime.utcnow()
+    db.session.commit()
+
+# --- Admin User Activity Report ---
+class AdminUserActivityAPI(Resource):
+    @auth_required('token')
+    @roles_required('admin')
+    def get(self, user_id):
+        reports = ActivityReport.query.filter_by(user_id=user_id).order_by(ActivityReport.month.desc()).all()
+        result = []
+        for r in reports:
+            result.append({
+                'month': r.month,
+                'total_reservations': r.total_reservations,
+                'total_spent': r.total_spent,
+                'most_used_lot': r.most_used_lot.prime_location_name if r.most_used_lot else 'N/A',
+                'last_updated': r.last_updated.isoformat() if r.last_updated else None
+            })
+        return {'reports': result}, 200
+
+api.add_resource(AdminUserActivityAPI, '/admin/user/<int:user_id>/activity')

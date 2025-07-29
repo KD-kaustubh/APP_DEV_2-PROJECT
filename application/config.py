@@ -13,3 +13,9 @@ class LocalDevelopmentConfig(Config):
     SECURITY_PASSWORD_SALT = 'this_is_a_salt' # it hels in hash pswd
     WTF_CSRF_ENABLED = False #form protection
     SECURITY_TOKEN_AUTHENTICATION_HEADER = 'Authentication-Token'
+
+    CELERY = {
+        'broker_url': 'redis://localhost:6379/0',
+        'result_backend': 'redis://localhost:6379/1',
+        'timezone': 'Asia/Kolkata',
+    }

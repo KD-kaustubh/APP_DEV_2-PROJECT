@@ -14,6 +14,10 @@ export default {
                 <button class="btn btn-primary" @click="showAddForm">Add New Parking Lot</button>
                 <!-- Add this button to your admin dashboard button group -->
                 <button class="btn btn-success" @click="showView = 'view_stats'; fetchAdminStats();">View Statistics</button>
+                <button class="btn btn-success" @click="exportCSV" :disabled="csvExporting">
+                    <span v-if="csvExporting" class="spinner-border spinner-border-sm me-2"></span>
+                    Download Activity CSV
+                </button>
             </div>
             <div>
                 <!-- View 1: Show All Parking Lots Table -->
@@ -110,6 +114,7 @@ export default {
                             <th>Name</th>
                             <th>Current Spot</th>
                             <th>Status</th>
+                            <th>Action</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -119,6 +124,9 @@ export default {
                             <td>{{ user.uname }}</td>
                             <td>{{ user.current_spot || '-' }}</td>
                             <td>{{ user.status }}</td>
+                            <td>
+                              <button class="btn btn-info btn-sm" @click="viewUserActivity(user)">View Activity</button>
+                            </td>
                           </tr>
                         </tbody>
                     </table>
@@ -299,6 +307,42 @@ export default {
             </div>
           </div>
         </div>
+
+        <!-- #################### USER ACTIVITY MODAL #################### -->
+        <div class="modal fade" id="userActivityModal" tabindex="-1" aria-labelledby="userActivityModalLabel" aria-hidden="true">
+          <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+              <div class="modal-header">
+                <h5 class="modal-title" id="userActivityModalLabel">
+                  Activity Report for {{ activityUserName }}
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+              </div>
+              <div class="modal-body">
+                <table class="table table-bordered">
+                  <thead>
+                    <tr>
+                      <th>Month</th>
+                      <th>Total Reservations</th>
+                      <th>Total Spent</th>
+                      <th>Most Used Lot</th>
+                      <th>Last Updated</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="r in userActivityReports" :key="r.month">
+                      <td>{{ r.month }}</td>
+                      <td>{{ r.total_reservations }}</td>
+                      <td>₹{{ r.total_spent }}</td>
+                      <td>{{ r.most_used_lot }}</td>
+                      <td>{{ r.last_updated ? toIST(r.last_updated) : '-' }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
     </div>
     `,
     data() {
@@ -332,6 +376,12 @@ export default {
             lotSpots: [],
             spotsLotName: '',
             spotsModal: null,
+            activityUserName: '',
+            userActivityReports: [],
+            userActivityModal: null,
+            csvExporting: false,
+            csvTaskId: null,
+            csvPollInterval: null,
         };
     },
     computed: {
@@ -403,9 +453,19 @@ export default {
             if (!confirm('Are you sure you want to delete this parking lot? This cannot be undone.')) { return; }
             try {
                 const data = await this.apiFetch(`/api/admin/parking-lots/${lotId}`, { method: 'DELETE' });
-                alert(data.message); this.fetchLots(); // Refresh list after deleting
+                alert(data.message); this.fetchLots(); 
             } catch (error) { console.error("Failed to delete lot:", error); }
         },
+        async exportCSV() {
+            fetch('/api/export')
+            .then(response => response.json())
+            .then(data => {
+                window.location.href = `/api/csv_result/${data.id}`;
+            })
+        },
+
+
+
         // --------- USER METHODS (Updated for Modal Flow) ---------
         openBookingModal(lotId) {
             this.bookingLotId = lotId;
@@ -644,6 +704,27 @@ export default {
                 alert("Failed to fetch spot details.");
             }
         },
+        async viewUserActivity(user) {
+            try {
+                const data = await this.apiFetch(`/api/admin/user/${user.id}/activity`);
+                this.userActivityReports = data.reports;
+                this.activityUserName = user.uname;
+                if (!this.userActivityModal) {
+                    this.userActivityModal = new bootstrap.Modal(document.getElementById('userActivityModal'));
+                }
+                this.userActivityModal.show();
+            } catch (error) {
+                alert("Failed to fetch user activity report.");
+            }
+        },
+        async fetchUserActivityReports(userId) {
+            try {
+                const data = await this.apiFetch(`/api/admin/users/${userId}/activity-reports`);
+                this.userActivityReports = data.reports;
+            } catch (error) {
+                console.error("Failed to fetch user activity reports:", error);
+            }
+        }
     },
     async mounted() {
         if (!this.authToken) { this.$router.push('/login'); return; }
