@@ -1,7 +1,7 @@
-from jinja2 import Template
+from jinja2 import Environment, FileSystemLoader
 
 
-def format_report(html_template,data):
-    with open(html_template) as file:
-        template = Template(file.read())
-        return template.render(data=data)
+def format_report(template_path, data):
+    env = Environment(loader=FileSystemLoader('templates'))
+    template = env.get_template(template_path.split('/')[-1])
+    return template.render(data=data)

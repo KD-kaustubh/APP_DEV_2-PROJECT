@@ -19,3 +19,7 @@ class LocalDevelopmentConfig(Config):
         'result_backend': 'redis://localhost:6379/1',
         'timezone': 'Asia/Kolkata',
     }
+
+    CACHE_TYPE = 'RedisCache'  # Use Redis cache for development
+    CACHE_DEFAULT_TIMEOUT = 30
+    CACHE_REDIS_PORT = 6379  # Default cache timeout in seconds

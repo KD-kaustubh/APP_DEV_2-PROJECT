@@ -4,7 +4,6 @@ from datetime import datetime, timezone
 
 class User(db.Model,UserMixin):
     __tablename__ = 'user'
-    #req for flask security
     id=db.Column(db.Integer, primary_key=True)
     email = db.Column(db.String(255), unique=True, nullable=False)
     uname = db.Column(db.String(255), unique=True, nullable=False)
@@ -18,7 +17,6 @@ class User(db.Model,UserMixin):
 
 class Role(db.Model,RoleMixin):
     __tablename__ = 'role'
-    #req for flask security
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(80), unique=True, nullable=False)
     description = db.Column(db.String(255), nullable=True)
@@ -26,7 +24,6 @@ class Role(db.Model,RoleMixin):
 #many to many (1-1) relationship becoz of flask sequrity
 class UsersRoles(db.Model):
     __tablename__ = 'users_roles'
-    #req for flask security
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     role_id = db.Column(db.Integer, db.ForeignKey('role.id'), nullable=False)
@@ -81,7 +78,7 @@ class ActivityReport(db.Model):
     __tablename__ = 'activity_report'
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    month = db.Column(db.String(20), nullable=False)  # e.g., "2025-04"
+    month = db.Column(db.String(20), nullable=False)
     total_reservations = db.Column(db.Integer, default=0)
     total_spent = db.Column(db.Float, default=0.0)
     most_used_lot_id = db.Column(db.Integer, db.ForeignKey('parking_lot.id'), nullable=True)

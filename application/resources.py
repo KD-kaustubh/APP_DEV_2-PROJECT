@@ -10,8 +10,11 @@ from sqlalchemy.orm import subqueryload, joinedload
 from sqlalchemy import func, extract
 import logging
 import math
+from application import cache
 
-# Set up logging
+
+cache=  app.cache
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -56,8 +59,6 @@ api.add_resource(Login, '/login')
 
 
 # --- Admin Parking Lot Management ---
-
-# REFACTORED: To ensure creating a lot and its spots is an atomic operation.
 class ParkingLotOps(Resource):
     @auth_required('token')
     @roles_required('admin')
@@ -72,7 +73,7 @@ class ParkingLotOps(Resource):
                 number_of_spots=data['spots']
             )
             db.session.add(lot)
-            db.session.flush()  # Flushes to get the lot.id without committing
+            db.session.flush()  
 
             for _ in range(data['spots']):
                 spot = ParkingSpot(lot_id=lot.id, status='A')
@@ -86,14 +87,13 @@ class ParkingLotOps(Resource):
             logger.error(f"Error creating parking lot: {e}")
             return {"message": "Could not create parking lot due to an internal error."}, 500
 
-    # REFACTORED: To fix the N+1 query problem for better performance.
     @auth_required('token')
     @roles_required('admin')
+    @cache.cached(timeout=5)  
     def get(self):
         lots = ParkingLot.query.options(subqueryload(ParkingLot.spots)).all()
         result = []
         for lot in lots:
-            # lot.spots is now pre-loaded, so this loop does not cause new DB queries.
             available = sum(1 for s in lot.spots if s.status == 'A')
             result.append({
                 'id': lot.id,
@@ -109,8 +109,7 @@ class ParkingLotOps(Resource):
 
 api.add_resource(ParkingLotOps, '/admin/parking-lots')
 
-
-# REFACTORED: To ensure updates and deletions are atomic operations.
+# --- Admin Parking Lot Detail Management ---
 class ParkingLotDetailOps(Resource):
     @auth_required('token')
     @roles_required('admin')
@@ -172,21 +171,18 @@ class ParkingLotDetailOps(Resource):
 api.add_resource(ParkingLotDetailOps, '/admin/parking-lots/<int:lot_id>')
 
 
-# --- User Reservation Management ---
-
-# REFACTORED: To use atomic transactions and consistent UTC time.
+#User Reservation Management 
 class ReserveParking(Resource):
     @auth_required('token')
     @roles_required('user')
     def post(self):
-        # --- GET VEHICLE NUMBER FROM REQUEST ---
+      
         data = request.get_json()
         lot_id = data.get('lot_id')
         vehicle_number = data.get('vehicle_number')
 
         if not vehicle_number:
             return {'message': 'Vehicle number is required'}, 400
-        # ----------------------------------------
 
         lot = ParkingLot.query.get(lot_id)
         if not lot:
@@ -201,16 +197,14 @@ class ReserveParking(Resource):
             reservation = Reservation(
                 spot_id=available_spot.id,
                 user_id=current_user.id,
-                # --- ADD VEHICLE NUMBER HERE ---
                 vehicle_number=vehicle_number,
-                # -------------------------------
                 parking_timestamp=datetime.now(IST),
                 parking_cost=lot.price
             )
             db.session.add(reservation)
             db.session.commit()
 
-            # --- UPDATE ACTIVITY REPORT ---
+            
             update_activity_report(
                 user_id=current_user.id,
                 dt=reservation.parking_timestamp,
@@ -222,7 +216,7 @@ class ReserveParking(Resource):
                 'message': 'Parking spot reserved successfully',
                 'lot_id': lot.id,
                 'spot_id': available_spot.id,
-                'vehicle_number': reservation.vehicle_number, # Also return it in the response
+                'vehicle_number': reservation.vehicle_number, 
                 'timestamp': reservation.parking_timestamp.isoformat()
             }, 201
         except Exception as e:
@@ -232,12 +226,11 @@ class ReserveParking(Resource):
 
 api.add_resource(ReserveParking, '/user/reserve-parking')
 
-# REFACTORED: To use atomic transactions and consistent UTC time.
+
 class VacateParking(Resource):
     @auth_required('token')
     @roles_required('user')
     def post(self):
-        # Find the active reservation for the current user
         active_reservation = Reservation.query.filter_by(
             user_id=current_user.id,
             leaving_timestamp=None
@@ -260,10 +253,10 @@ class VacateParking(Resource):
             duration = now - active_reservation.parking_timestamp
             hours = duration.total_seconds() / 3600
 
-            # Always round up to the next hour, minimum 1 hour
+           
             final_cost = max(1, math.ceil(hours)) * spot.lot.price
 
-            # Update the records
+            
             spot.status = 'A'
             active_reservation.leaving_timestamp = now
             active_reservation.parking_cost = final_cost
@@ -283,7 +276,6 @@ class VacateParking(Resource):
 api.add_resource(VacateParking, '/user/vacate-parking')
 
 
-# REFACTORED: To fix the N+1 query problem for better performance.
 class UserReservations(Resource):
     @auth_required('token')
     @roles_required('user')
@@ -300,7 +292,7 @@ class UserReservations(Resource):
                 'spot_id': r.spot_id,
                 'lot_id': r.spot.lot_id if r.spot else None,
                 'lot_location': r.spot.lot.prime_location_name if r.spot and r.spot.lot else None,  # <-- Add this
-                'vehicle_number': r.vehicle_number,  # <-- Add this
+                'vehicle_number': r.vehicle_number,  
                 'parking_timestamp': r.parking_timestamp.isoformat(),
                 'release_timestamp': r.leaving_timestamp.isoformat() if r.leaving_timestamp else None,
                 'parking_cost': r.parking_cost,
@@ -313,10 +305,10 @@ class UserReservations(Resource):
 api.add_resource(UserReservations, '/user/reservations')
 
 
-# REFACTORED: To fix the N+1 query problem for better performance.
 class UserLots(Resource):
     @auth_required('token')
     @roles_required('user')
+    @cache.cached(timeout=5)  
     def get(self):
         lots = ParkingLot.query.options(subqueryload(ParkingLot.spots)).all()
         result = []
@@ -350,12 +342,10 @@ class ProcessPayment(Resource):
         if reservation.leaving_timestamp is None:
             return {'message': 'Cannot pay for a reservation that is still active.'}, 400
 
-        # Check if already paid
         if Payment.query.filter_by(reservation_id=reservation_id).first():
             return {'message': 'This reservation has already been paid for.'}, 400
             
         try:
-            # Create a fake successful payment record
             new_payment = Payment(
                 reservation_id=reservation.id,
                 user_id=current_user.id,
@@ -365,7 +355,7 @@ class ProcessPayment(Resource):
             db.session.add(new_payment)
             db.session.commit()
             
-            # --- UPDATE ACTIVITY REPORT ---
+
             update_activity_report(
                 user_id=current_user.id,
                 dt=reservation.leaving_timestamp or reservation.parking_timestamp,
@@ -384,6 +374,7 @@ class ProcessPayment(Resource):
 class UserActivityAPI(Resource):
     @auth_required('token')
     @roles_required('user')
+    @cache.cached(timeout=5)  # <-- .
     def get(self):
         reports = ActivityReport.query.filter_by(user_id=current_user.id).order_by(ActivityReport.month.desc()).all()
         result = []
@@ -408,7 +399,6 @@ class AdminUsers(Resource):
         users = [u for u in User.query.all() if any(role.name == 'user' for role in u.roles)]
         result = []
         for u in users:
-            # Find active reservation (if any)
             active_res = Reservation.query.filter_by(user_id=u.id, leaving_timestamp=None).first()
             result.append({
                 'id': u.id,
@@ -425,6 +415,7 @@ api.add_resource(AdminUsers, '/admin/users')
 class AdminSpotDetails(Resource):
     @auth_required('token')
     @roles_required('admin')
+    @cache.cached(timeout=5)  
     def get(self, lot_id):
         spots = ParkingSpot.query.filter_by(lot_id=lot_id).all()
         result = []
@@ -434,7 +425,6 @@ class AdminSpotDetails(Resource):
                 'status': 'Available' if spot.status == 'A' else 'Occupied'
             }
             if spot.status == 'O':
-                # Find the active reservation for this spot
                 reservation = Reservation.query.filter_by(
                     spot_id=spot.id, 
                     leaving_timestamp=None
@@ -449,11 +439,11 @@ class AdminSpotDetails(Resource):
 class AdminSummary(Resource):
     @auth_required('token')
     @roles_required('admin')
+    @cache.cached(timeout=5)  
     def get(self):
         total_spots = db.session.query(db.func.count(ParkingSpot.id)).scalar()
         occupied_spots = db.session.query(db.func.count(ParkingSpot.id)).filter(ParkingSpot.status == 'O').scalar()
         
-        # Data for lots breakdown chart
         lots = ParkingLot.query.options(subqueryload(ParkingLot.spots)).all()
         lots_data = []
         for lot in lots:
@@ -480,6 +470,7 @@ api.add_resource(AdminSummary, '/admin/summary')
 class AdminRevenueSummary(Resource):
     @auth_required('token')
     @roles_required('admin')
+    @cache.cached(timeout=5)  # <-- .
     def get(self):
         lots = ParkingLot.query.all()
         result = []
@@ -508,7 +499,7 @@ def update_activity_report(user_id, dt, lot_id=None, amount=0, add_reservation=F
     if add_spent:
         report.total_spent = (report.total_spent or 0) + (amount or 0)
     if lot_id:
-        report.most_used_lot_id = lot_id  # (Optional: add logic to find most used lot)
+        report.most_used_lot_id = lot_id 
     report.last_updated = datetime.utcnow()
     db.session.commit()
 
@@ -516,6 +507,7 @@ def update_activity_report(user_id, dt, lot_id=None, amount=0, add_reservation=F
 class AdminUserActivityAPI(Resource):
     @auth_required('token')
     @roles_required('admin')
+    @cache.cached(timeout=5)  # <-- .
     def get(self, user_id):
         reports = ActivityReport.query.filter_by(user_id=user_id).order_by(ActivityReport.month.desc()).all()
         result = []
@@ -536,7 +528,6 @@ class UserMonthlyLotSpending(Resource):
     @auth_required('token')
     @roles_required('user')
     def get(self):
-        # Query for amount spent per lot per month
         results = (
             db.session.query(
                 func.strftime('%Y-%m', Reservation.parking_timestamp).label('month'),
@@ -554,8 +545,6 @@ class UserMonthlyLotSpending(Resource):
             .order_by('month')
             .all()
         )
-
-        # Organize data per month
         month_dict = {}
         for row in results:
             if row.month not in month_dict:
@@ -566,8 +555,6 @@ class UserMonthlyLotSpending(Resource):
                 'reservations_count': row.reservations_count
             })
             month_dict[row.month]['total_reservations'] += row.reservations_count
-
-        # Format for frontend
         response = []
         for month, data in month_dict.items():
             response.append({

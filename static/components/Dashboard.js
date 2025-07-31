@@ -5,7 +5,6 @@ export default {
         <div v-if="loading" class="text-center">
             <div class="spinner-border" role="status"><span class="visually-hidden">Loading...</span></div>
         </div>
-
         <!-- #################### ADMIN DASHBOARD ######################## -->
         <div v-else-if="userRole === 'admin'">
             <h2 class="text-center mt-4 mb-2">Admin Dashboard</h2>
@@ -70,7 +69,7 @@ export default {
                     </div>
                 </div>
 
-                <!-- View 4: Parking Lot Details (Newly Added) -->
+                <!-- View 4: Parking Lot Details  -->
                 <div v-if="selectedLot" class="card mt-3">
                     <div class="card-header">
                         <strong>Parking Lot Details</strong>
@@ -112,7 +111,6 @@ export default {
                             <th>#</th>
                             <th>Email</th>
                             <th>Name</th>
-                            <th>Current Spot</th>
                             <th>Status</th>
                             <th>Action</th>
                           </tr>
@@ -122,7 +120,6 @@ export default {
                             <td>{{ index + 1 }}</td>
                             <td>{{ user.email }}</td>
                             <td>{{ user.uname }}</td>
-                            <td>{{ user.current_spot || '-' }}</td>
                             <td>{{ user.status }}</td>
                             <td>
                               <button class="btn btn-info btn-sm" @click="viewUserActivity(user)">View Activity</button>
@@ -203,6 +200,7 @@ export default {
                     </tbody>
                 </table>
             </div>
+            
             <div v-if="selectedLot" class="card mt-3">
                 <div class="card-header">
                     <strong>Parking Lot Details</strong>
@@ -216,8 +214,8 @@ export default {
                     <p><strong>Total Spots:</strong> {{ selectedLot.total_spots }}</p>
                     <p><strong>Available Spots:</strong> {{ selectedLot.available_spots }}</p>
                     <p><strong>Occupied Spots:</strong> {{ selectedLot.occupied_spots }}</p>
-    </div>
-</div>
+                </div>
+            </div>
 
             <!-- #################### USER STATS VIEW #################### -->
             <div v-if="showView === 'user_stats'">
@@ -439,7 +437,7 @@ export default {
         },
         cancelForm() {
             this.showView = 'view_lots';
-            this.editLotData = null; // Clear edit data
+            this.editLotData = null; 
         },
         async createLot() {
             if (!this.newLot.location || this.newLot.price <= 0 || this.newLot.spots <= 0) { alert('Please fill all fields correctly.'); return; }
@@ -460,7 +458,7 @@ export default {
                 };
                 const data = await this.apiFetch(`/api/admin/parking-lots/${this.editLotData.id}`, { method: 'PUT', body: JSON.stringify(payload) });
                 alert(data.message);
-                this.fetchLots(); // Refresh list after updating
+                this.fetchLots(); 
             } catch (error) { console.error("Failed to update lot:", error); }
         },
         async deleteLot(lotId) {
@@ -575,14 +573,11 @@ export default {
             try {
                 const data = await this.apiFetch(`/api/user/payment/${reservationId}`, { method: 'POST' });
                 alert(data.message);
-                // Mark as paid locally to update UI instantly before refetching
                 const reservation = this.reservations.find(r => r.reservation_id === reservationId);
                 if (reservation) {
                     reservation.paid = true;
-                    reservation.status = 'Paid'; // <-- Add this line!
+                    reservation.status = 'Paid'; 
                 }
-                // Optionally, you can also refetch all data:
-                // await this.fetchInitialUserData();
             } catch (error) {
                 console.error("Payment failed:", error);
             }
@@ -596,11 +591,10 @@ export default {
             this.selectedLot = lot;
         },
         async fetchAdminStats() {
-            // Fetch occupancy data
+
             const summary = await this.apiFetch('/api/admin/summary');
             this.adminStats = { occupancy: summary };
 
-            // Fetch revenue data (implement this endpoint in Flask)
             const revenue = await this.apiFetch('/api/admin/revenue-summary');
             this.adminStats.revenue = revenue;
 
@@ -644,7 +638,7 @@ export default {
             try {
                 const data = await this.apiFetch('/api/user/reports-lotwise');
                 this.userStats = data.reports;
-                console.log("User stats:", this.userStats); // <-- Add this line
+                console.log("User stats:", this.userStats);
                 this.$nextTick(() => {
                     this.renderUserCharts();
                 });
@@ -655,8 +649,6 @@ export default {
         renderUserCharts() {
             if (this.userReservationsChart) this.userReservationsChart.destroy();
             if (this.userSpentChart) this.userSpentChart.destroy();
-
-            // Convert "YYYY-MM" to "Month YYYY"
             const months = this.userStats.map(r => {
                 const [year, month] = r.month.split('-');
                 const date = new Date(year, month - 1);
@@ -679,9 +671,7 @@ export default {
             });
 
             // Amount Spent per Month per Lot (bar)
-            // Collect all unique lot names
             const lotNames = Array.from(new Set(this.userStats.flatMap(r => (r.lots || []).map(l => l.lot_name))));
-            // Build datasets for each lot
             const datasets = lotNames.map((lot, idx) => ({
                 label: lot,
                 data: this.userStats.map(r => {
@@ -758,7 +748,7 @@ export default {
 
         if (this.userRole === 'admin') {
             await this.fetchLots();
-            await this.fetchAllUsers(); // <-- Add this line
+            await this.fetchAllUsers(); 
             this.showView = 'view_lots';
         } else {
             await this.fetchInitialUserData();

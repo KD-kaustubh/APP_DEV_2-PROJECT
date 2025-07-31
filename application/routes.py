@@ -4,12 +4,24 @@ from flask_security import auth_required, roles_required, current_user, hash_pas
 from application.models import User, Role
 from celery.result import AsyncResult
 from application.task import csv_report
+from datetime import datetime
+from application import cache
+
 
 main_bp = Blueprint('main', __name__)
+
+@cache.cached(timeout=5)
 
 @main_bp.route('/', methods=['GET'])
 def home():
     return render_template('index.html')
+
+@main_bp.route('/cache', methods=['GET'])
+def cache_test():
+    return {'time': str(datetime.now())}
+
+
+
 
 @main_bp.route('/api/home')
 @auth_required('token')

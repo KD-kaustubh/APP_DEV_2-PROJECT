@@ -1,4 +1,4 @@
-import Home from './components/home.js';
+import Home from './components/Home.js';
 import Login from './components/Login.js';
 import Register from './components/Register.js';
 import Navbar from './components/Navbar.js';
