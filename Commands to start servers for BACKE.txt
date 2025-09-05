@@ -1,0 +1,32 @@
+Commands to start servers for BACKEND JOBS.
+
+python3 -m venv myenv
+source myenv/bin/activate
+pip3 install -r requirements.txt
+
+# starting a MailHog server.
+~/go/bin/MailHog
+
+# starting redis server for caching one
+redis-server start
+
+# checking if it is started.
+redis-cli ping
+OUTPUT - PONG
+
+# starting a celery worker - For async tasks.
+celery -A app:celery_app worker -l INFO
+
+celery -A app:celery_app beat
+
+
+
+
+
+
+# starting redis server for caching one
+sudo service redis-server start
+# stoping redis server
+redis-cli shutdown
+OR
+sudo service redis-server stop
