@@ -1,8 +1,8 @@
 Commands to start servers for BACKEND JOBS.
 
-python3 -m venv myenv
-source myenv/bin/activate
-pip3 install -r requirements.txt
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
 
 # starting a MailHog server.
 ~/go/bin/MailHog
