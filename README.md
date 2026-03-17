@@ -6,6 +6,23 @@ A comprehensive web application for managing parking lots, tracking vehicle rese
 
 This full-stack application provides a complete parking management solution with role-based access control (admin/user), automated reporting, and real-time parking spot availability tracking. The system handles vehicle reservations, calculates parking costs based on duration, processes payments, and generates monthly activity reports for users.
 
+## 🌐 Live Deployment
+
+- **Live App (Render):** https://vehicle-parking-app-6vcv.onrender.com
+- **Frontend + Backend:** Served from the same Flask app deployment
+- **Deployment Mode:** Docker on Render (free instance)
+
+### Demo Checklist (Presentation Ready)
+
+1. Open the live URL and show landing page.
+2. Login as admin and demonstrate lot management + analytics charts.
+3. Login as user and demonstrate reserve, vacate, and payment flow.
+4. Show occupied lot protection (edit/delete blocked when spots are occupied).
+
+### Demo Note
+
+- On free-tier hosting, services may sleep during inactivity (cold start on first request).
+
 ## ✨ Features
 
 ### User Features
