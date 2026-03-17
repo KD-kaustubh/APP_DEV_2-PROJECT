@@ -10,6 +10,7 @@ from sqlalchemy.orm import subqueryload, joinedload
 from sqlalchemy import func, extract
 import logging
 import math
+import re
 from application import cache
 
 
@@ -19,6 +20,37 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 api = Api(prefix='/api')
+
+
+def _normalize_pin(pin_value):
+    pin = str(pin_value or '').strip()
+    if not (pin.isdigit() and 4 <= len(pin) <= 10):
+        return None
+    return pin
+
+
+def _normalize_positive_int(value):
+    try:
+        parsed = int(value)
+        return parsed if parsed > 0 else None
+    except (TypeError, ValueError):
+        return None
+
+
+def _normalize_positive_float(value):
+    try:
+        parsed = float(value)
+        return parsed if parsed > 0 else None
+    except (TypeError, ValueError):
+        return None
+
+
+def _normalize_vehicle_number(value):
+    # Store a canonical format to avoid duplicates like "UP32 L1234" vs "UP32-L1234".
+    normalized = re.sub(r'[^A-Za-z0-9]', '', str(value or '').upper())
+    if not (6 <= len(normalized) <= 20):
+        return None
+    return normalized
 
 def roles_list(roles):
     return [role.name for role in roles]
@@ -63,19 +95,36 @@ class ParkingLotOps(Resource):
     @auth_required('token')
     @roles_required('admin')
     def post(self):
-        data = request.get_json()
+        data = request.get_json() or {}
+        location = str(data.get('location') or '').strip()
+        address = str(data.get('address') or '').strip()
+        price = _normalize_positive_float(data.get('price'))
+        spots = _normalize_positive_int(data.get('spots'))
+        pin = _normalize_pin(data.get('pin'))
+
+        if not location:
+            return {"message": "Location is required."}, 400
+        if not address:
+            return {"message": "Address is required."}, 400
+        if price is None:
+            return {"message": "Price must be a positive number."}, 400
+        if spots is None:
+            return {"message": "Number of spots must be a positive integer."}, 400
+        if pin is None:
+            return {"message": "Pin code must be 4 to 10 digits."}, 400
+
         try:
             lot = ParkingLot(
-                prime_location_name=data['location'],
-                price=data['price'],
-                address=data['address'],
-                pin_code=data['pin'],
-                number_of_spots=data['spots']
+                prime_location_name=location,
+                price=price,
+                address=address,
+                pin_code=pin,
+                number_of_spots=spots
             )
             db.session.add(lot)
             db.session.flush()  
 
-            for _ in range(data['spots']):
+            for _ in range(spots):
                 spot = ParkingSpot(lot_id=lot.id, status='A')
                 db.session.add(spot)
             
@@ -118,16 +167,44 @@ class ParkingLotDetailOps(Resource):
         if not lot:
             return {'message': 'Parking lot not found'}, 404
 
-        data = request.get_json()
+        occupied_count = ParkingSpot.query.filter_by(lot_id=lot.id, status='O').count()
+        if occupied_count > 0:
+            return {
+                'message': f'Cannot edit parking lot while {occupied_count} spot(s) are occupied. Vacate all active vehicles first.'
+            }, 400
+
+        data = request.get_json() or {}
         try:
-            lot.prime_location_name = data.get('location', lot.prime_location_name)
-            lot.price = data.get('price', lot.price)
-            lot.address = data.get('address', lot.address)
-            lot.pin_code = data.get('pin', lot.pin_code)
-            new_spots_count = data.get('spots')
-            if new_spots_count is not None and isinstance(new_spots_count, int):
+            if 'location' in data:
+                location = str(data.get('location') or '').strip()
+                if not location:
+                    return {"message": "Location cannot be empty."}, 400
+                lot.prime_location_name = location
+
+            if 'address' in data:
+                address = str(data.get('address') or '').strip()
+                if not address:
+                    return {"message": "Address cannot be empty."}, 400
+                lot.address = address
+
+            if 'price' in data:
+                price = _normalize_positive_float(data.get('price'))
+                if price is None:
+                    return {"message": "Price must be a positive number."}, 400
+                lot.price = price
+
+            if 'pin' in data:
+                pin = _normalize_pin(data.get('pin'))
+                if pin is None:
+                    return {"message": "Pin code must be 4 to 10 digits."}, 400
+                lot.pin_code = pin
+
+            if 'spots' in data:
+                new_spots_count = _normalize_positive_int(data.get('spots'))
+                if new_spots_count is None:
+                    return {"message": "Number of spots must be a positive integer."}, 400
+
                 diff = new_spots_count - lot.number_of_spots
-                occupied_count = ParkingSpot.query.filter_by(lot_id=lot.id, status='O').count()
                 if diff > 0:
                     for _ in range(diff):
                         db.session.add(ParkingSpot(lot_id=lot.id, status='A'))
@@ -155,8 +232,11 @@ class ParkingLotDetailOps(Resource):
         if not lot:
             return {'message': 'Parking lot not found'}, 404
 
-        if ParkingSpot.query.filter_by(lot_id=lot.id, status='O').first():
-            return {'message': 'Cannot delete parking lot. Some spots are still occupied.'}, 400
+        occupied_count = ParkingSpot.query.filter_by(lot_id=lot.id, status='O').count()
+        if occupied_count > 0:
+            return {
+                'message': f'Cannot delete parking lot while {occupied_count} spot(s) are occupied.'
+            }, 400
         
         try:
             ParkingSpot.query.filter_by(lot_id=lot.id).delete()
@@ -177,12 +257,24 @@ class ReserveParking(Resource):
     @roles_required('user')
     def post(self):
       
-        data = request.get_json()
-        lot_id = data.get('lot_id')
-        vehicle_number = data.get('vehicle_number')
+        data = request.get_json() or {}
+        lot_id = _normalize_positive_int(data.get('lot_id'))
+        vehicle_number = _normalize_vehicle_number(data.get('vehicle_number'))
+
+        if lot_id is None:
+            return {'message': 'Valid lot_id is required'}, 400
 
         if not vehicle_number:
-            return {'message': 'Vehicle number is required'}, 400
+            return {'message': 'Vehicle number is required and must be 6-20 alphanumeric characters.'}, 400
+
+        existing_active_for_vehicle = Reservation.query.filter_by(
+            vehicle_number=vehicle_number,
+            leaving_timestamp=None
+        ).first()
+        if existing_active_for_vehicle:
+            return {
+                'message': 'This vehicle already has an active parking reservation. Please vacate the active spot first.'
+            }, 400
 
         lot = ParkingLot.query.get(lot_id)
         if not lot:

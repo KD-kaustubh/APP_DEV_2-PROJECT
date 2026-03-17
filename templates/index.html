@@ -24,7 +24,9 @@
         height: 100%;
         margin: 0;
         padding: 0;
-        background-color: skyblue;
+        background:
+            radial-gradient(1200px 600px at 15% 10%, rgba(255, 255, 255, 0.45), rgba(255, 255, 255, 0) 60%),
+            linear-gradient(180deg, #7bc4df 0%, #9ad6ea 38%, #b7e4f2 100%);
         overflow: hidden;
     }
 
@@ -56,6 +58,38 @@
         margin-top: 50px;
     }
 
+    .home-hero-wrap {
+        min-height: calc(100vh - 140px);
+        display: grid;
+        place-items: center;
+        padding: 1.25rem;
+    }
+
+    .home-hero-card {
+        width: min(920px, 96vw);
+        border: 0;
+        border-radius: 1rem;
+        background: rgba(255, 255, 255, 0.92);
+        box-shadow: 0 20px 40px rgba(14, 45, 61, 0.2);
+    }
+
+    .feature-badges {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 0.6rem;
+    }
+
+    .feature-badge {
+        border: 1px solid #cbe4ef;
+        background: #f5fbfe;
+        color: #21556b;
+        border-radius: 999px;
+        padding: 0.35rem 0.75rem;
+        font-size: 0.88rem;
+        font-weight: 500;
+    }
+
     /* Unified button rhythm across admin/user/auth screens */
     .btn:not(.btn-sm):not(.navbar-toggler) {
         border-radius: 0.5rem;
@@ -66,6 +100,44 @@
 
     .btn.btn-sm {
         border-radius: 0.45rem;
+    }
+
+    .nav-glass {
+        background: linear-gradient(90deg, rgba(15, 82, 140, 0.95), rgba(30, 122, 170, 0.92));
+        backdrop-filter: blur(8px);
+        box-shadow: 0 8px 24px rgba(10, 45, 79, 0.2);
+        min-height: 64px;
+    }
+
+    .nav-glass .navbar-brand {
+        letter-spacing: 0.2px;
+    }
+
+    .nav-pill {
+        border-radius: 999px;
+        padding: 0.35rem 0.8rem;
+        transition: background-color 0.2s ease, color 0.2s ease;
+    }
+
+    .nav-pill:hover,
+    .nav-pill.active {
+        background: rgba(255, 255, 255, 0.2);
+        color: #fff !important;
+    }
+
+    .role-badge {
+        background: rgba(255, 255, 255, 0.2);
+        color: #fff;
+        border: 1px solid rgba(255, 255, 255, 0.35);
+        font-weight: 500;
+        padding: 0.4rem 0.7rem;
+        border-radius: 999px;
+    }
+
+    /* Keep a single password toggle icon (custom eye in Vue forms) */
+    input[type="password"]::-ms-reveal,
+    input[type="password"]::-ms-clear {
+        display: none;
     }
 </style>
 

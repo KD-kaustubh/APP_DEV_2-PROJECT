@@ -9,10 +9,8 @@ from application import cache
 
 
 main_bp = Blueprint('main', __name__)
-
-@cache.cached(timeout=5)
-
 @main_bp.route('/', methods=['GET'])
+@cache.cached(timeout=5)
 def home():
     return render_template('index.html')
 
@@ -53,6 +51,8 @@ def create_user():
 
 #this manually trigger the job
 @main_bp.route('/api/export', methods=['GET'])
+@auth_required('token', 'session')
+@roles_required('admin')
 def export_csv():
     result = csv_report.delay()   # async object
     return jsonify({
@@ -63,8 +63,12 @@ def export_csv():
 
 #just created to test the result
 @main_bp.route('/api/csv_result/<id>')
+@auth_required('token', 'session')
+@roles_required('admin')
 def csv_result(id):
     result = AsyncResult(id)
+    if not result or not result.result:
+        return jsonify({"message": "Report is not ready yet."}), 202
     return send_from_directory('static', result.result, as_attachment=True)
 
 

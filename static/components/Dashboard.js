@@ -9,6 +9,42 @@ export default {
         <div v-else-if="userRole === 'admin'">
             <h2 class="text-center mt-4 mb-2">Admin Dashboard</h2>
             <p class="text-center mb-4">Welcome</p>
+
+            <div class="row g-3 mb-4">
+                <div class="col-6 col-lg-3">
+                    <div class="card h-100 border-0 shadow-sm">
+                        <div class="card-body">
+                            <div class="text-muted small">Total Lots</div>
+                            <div class="fs-4 fw-semibold">{{ adminKpis.totalLots }}</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6 col-lg-3">
+                    <div class="card h-100 border-0 shadow-sm">
+                        <div class="card-body">
+                            <div class="text-muted small">Total Spots</div>
+                            <div class="fs-4 fw-semibold">{{ adminKpis.totalSpots }}</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6 col-lg-3">
+                    <div class="card h-100 border-0 shadow-sm">
+                        <div class="card-body">
+                            <div class="text-muted small">Occupied Now</div>
+                            <div class="fs-4 fw-semibold text-danger">{{ adminKpis.occupiedSpots }}</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6 col-lg-3">
+                    <div class="card h-100 border-0 shadow-sm">
+                        <div class="card-body">
+                            <div class="text-muted small">Occupancy %</div>
+                            <div class="fs-4 fw-semibold text-primary">{{ adminKpis.occupancyPercent }}%</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <div class="d-grid gap-2 d-md-flex justify-content-md-start mb-4">
                 <button class="btn btn-primary" @click="showAddForm">Add New Parking Lot</button>
                 <!-- Add this button to your admin dashboard button group -->
@@ -23,7 +59,7 @@ export default {
                 <div v-if="showView === 'view_lots'">
                     <h3>All Parking Lots</h3>
                     <table class="table table-striped">
-                        <thead><tr><th>Location</th><th>Price</th><th>Total Spots</th><th>Available</th><th>Actions</th></tr></thead>
+                        <thead><tr><th>Location</th><th>Price</th><th>Total Spots</th><th>Available</th><th>Occupancy</th><th>Actions</th></tr></thead>
                         <tbody>
                             <tr v-for="lot in lots" :key="lot.id">
                                 <td>{{ lot.location }}</td>
@@ -31,9 +67,14 @@ export default {
                                 <td>{{ lot.total_spots }}</td>
                                 <td>{{ lot.available_spots }}</td>
                                 <td>
+                                    <span class="badge" :class="lotOccupancyPercent(lot) >= 85 ? 'bg-danger' : lotOccupancyPercent(lot) >= 60 ? 'bg-warning text-dark' : 'bg-success'">
+                                        {{ lotOccupancyPercent(lot) }}%
+                                    </span>
+                                </td>
+                                <td>
                                     <div class="d-flex flex-wrap gap-2">
-                                        <button class="btn btn-sm btn-info" @click="showEditForm(lot)">Edit</button>
-                                        <button class="btn btn-sm btn-danger" @click="deleteLot(lot.id)">Delete</button>
+                                        <button class="btn btn-sm btn-info" @click="showEditForm(lot)" :disabled="lot.occupied_spots > 0" :title="lot.occupied_spots > 0 ? 'Cannot edit while vehicles are parked' : 'Edit lot'">Edit</button>
+                                        <button class="btn btn-sm btn-danger" @click="deleteLot(lot.id, lot.occupied_spots)" :disabled="lot.occupied_spots > 0" :title="lot.occupied_spots > 0 ? 'Cannot delete while vehicles are parked' : 'Delete lot'">Delete</button>
                                         <button class="btn btn-sm btn-secondary" @click="showLotDetails(lot)">Details</button>
                                         <button class="btn btn-sm btn-warning" @click="viewSpots(lot)">View Spots</button>
                                     </div>
@@ -411,9 +452,29 @@ export default {
     computed: {
         hasActiveBooking() {
             return this.reservations.some(r => r.status === 'Active');
+        },
+        adminKpis() {
+            const totalLots = this.lots.length;
+            const totalSpots = this.lots.reduce((sum, lot) => sum + (lot.total_spots || 0), 0);
+            const availableSpots = this.lots.reduce((sum, lot) => sum + (lot.available_spots || 0), 0);
+            const occupiedSpots = Math.max(0, totalSpots - availableSpots);
+            const occupancyPercent = totalSpots > 0 ? Math.round((occupiedSpots / totalSpots) * 100) : 0;
+
+            return {
+                totalLots,
+                totalSpots,
+                occupiedSpots,
+                occupancyPercent,
+            };
         }
     },
     methods: {
+        lotOccupancyPercent(lot) {
+            const total = Number(lot.total_spots) || 0;
+            const occupied = Number(lot.occupied_spots) || 0;
+            if (total <= 0) return 0;
+            return Math.round((occupied / total) * 100);
+        },
         async apiFetch(url, options = {}) {
             const headers = {
                 'Content-Type': 'application/json',
@@ -444,6 +505,10 @@ export default {
             this.showView = 'add_lot';
         },
         showEditForm(lot) {
+            if ((lot.occupied_spots || 0) > 0) {
+                alert('Cannot edit this lot while vehicles are parked.');
+                return;
+            }
             this.hideLotDetails();
             this.editLotData = { ...lot };
             this.showView = 'edit_lot';
@@ -475,7 +540,11 @@ export default {
                 this.fetchLots(); 
             } catch (error) { console.error("Failed to update lot:", error); }
         },
-        async deleteLot(lotId) {
+        async deleteLot(lotId, occupiedSpots = 0) {
+            if (occupiedSpots > 0) {
+                alert('Cannot delete this lot while vehicles are parked.');
+                return;
+            }
             if (!confirm('Are you sure you want to delete this parking lot? This cannot be undone.')) { return; }
             try {
                 const data = await this.apiFetch(`/api/admin/parking-lots/${lotId}`, { method: 'DELETE' });
@@ -483,11 +552,23 @@ export default {
             } catch (error) { console.error("Failed to delete lot:", error); }
         },
         async exportCSV() {
-            fetch('/api/export')
-            .then(response => response.json())
-            .then(data => {
+            try {
+                const response = await fetch('/api/export', {
+                    method: 'GET',
+                    headers: {
+                        'Authentication-Token': this.authToken
+                    }
+                });
+                const data = await response.json();
+                if (!response.ok || !data.id) {
+                    alert(data.message || 'Failed to start CSV export.');
+                    return;
+                }
                 window.location.href = `/api/csv_result/${data.id}`;
-            })
+            } catch (error) {
+                console.error('Failed to export CSV:', error);
+                alert('Failed to start CSV export.');
+            }
         },
 
 
