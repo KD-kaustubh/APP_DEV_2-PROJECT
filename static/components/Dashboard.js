@@ -12,7 +12,7 @@ export default {
             <div class="d-grid gap-2 d-md-flex justify-content-md-start mb-4">
                 <button class="btn btn-primary" @click="showAddForm">Add New Parking Lot</button>
                 <!-- Add this button to your admin dashboard button group -->
-                <button class="btn btn-success" @click="showView = 'view_stats'; fetchAdminStats();">View Statistics</button>
+                <button class="btn btn-secondary" @click="hideLotDetails(); showView = 'view_stats'; fetchAdminStats();">View Statistics</button>
                 <button class="btn btn-success" @click="exportCSV" :disabled="csvExporting">
                     <span v-if="csvExporting" class="spinner-border spinner-border-sm me-2"></span>
                     Download Activity CSV
@@ -31,10 +31,12 @@ export default {
                                 <td>{{ lot.total_spots }}</td>
                                 <td>{{ lot.available_spots }}</td>
                                 <td>
-                                    <button class="btn btn-sm btn-info me-2" @click="showEditForm(lot)">Edit</button>
-                                    <button class="btn btn-sm btn-danger me-2" @click="deleteLot(lot.id)">Delete</button>
-                                    <button class="btn btn-sm btn-secondary me-2" @click="showLotDetails(lot)">Details</button>
-                                    <button class="btn btn-sm btn-warning" @click="viewSpots(lot)">View Spots</button>
+                                    <div class="d-flex flex-wrap gap-2">
+                                        <button class="btn btn-sm btn-info" @click="showEditForm(lot)">Edit</button>
+                                        <button class="btn btn-sm btn-danger" @click="deleteLot(lot.id)">Delete</button>
+                                        <button class="btn btn-sm btn-secondary" @click="showLotDetails(lot)">Details</button>
+                                        <button class="btn btn-sm btn-warning" @click="viewSpots(lot)">View Spots</button>
+                                    </div>
                                 </td>
                             </tr>
                         </tbody>
@@ -50,8 +52,10 @@ export default {
                          <div class="mb-3"><label class="form-label">Address</label><input type="text" class="form-control" v-model="newLot.address"></div>
                          <div class="mb-3"><label class="form-label">Pin Code</label><input type="text" class="form-control" v-model="newLot.pin"></div>
                          <div class="mb-3"><label class="form-label">Number of Spots</label><input type="number" class="form-control" v-model.number="newLot.spots"></div>
-                         <button class="btn btn-success me-2" @click="createLot">Create Lot</button>
-                         <button class="btn btn-secondary" @click="cancelForm">Cancel</button>
+                                 <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                                     <button class="btn btn-success" @click="createLot">Create Lot</button>
+                                     <button class="btn btn-secondary" @click="cancelForm">Cancel</button>
+                                 </div>
                     </div>
                 </div>
 
@@ -64,16 +68,18 @@ export default {
                          <div class="mb-3"><label class="form-label">Address</label><input type="text" class="form-control" v-model="editLotData.address"></div>
                          <div class="mb-3"><label class="form-label">Pin Code</label><input type="text" class="form-control" v-model="editLotData.pin"></div>
                          <div class="mb-3"><label class="form-label">Number of Spots</label><input type="number" class="form-control" v-model.number="editLotData.spots"></div>
-                         <button class="btn btn-success me-2" @click="updateLot">Save Changes</button>
-                         <button class="btn btn-secondary" @click="cancelForm">Cancel</button>
+                                 <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                                     <button class="btn btn-success" @click="updateLot">Save Changes</button>
+                                     <button class="btn btn-secondary" @click="cancelForm">Cancel</button>
+                                 </div>
                     </div>
                 </div>
 
                 <!-- View 4: Parking Lot Details  -->
-                <div v-if="selectedLot" class="card mt-3">
+                <div v-if="selectedLot && showView === 'view_lots'" class="card mt-3">
                     <div class="card-header">
                         <strong>Parking Lot Details</strong>
-                        <button type="button" class="btn-close float-end" aria-label="Close" @click="selectedLot = null"></button>
+                        <button type="button" class="btn-close float-end" aria-label="Close" @click="hideLotDetails"></button>
                     </div>
                     <div class="card-body">
                         <p><strong>Location:</strong> {{ selectedLot.location }}</p>
@@ -88,7 +94,7 @@ export default {
 
                 <!-- Add this section in your admin dashboard template -->
                 <div v-if="showView === 'view_stats'">
-                    <button class="btn btn-secondary mb-3" @click="showView = 'view_lots'">Close</button>
+                    <button class="btn btn-secondary mb-3" @click="hideLotDetails(); showView = 'view_lots'">Close</button>
                     <h3>Parking & Revenue Statistics</h3>
                     <div class="row">
                         <div class="col-md-6">
@@ -122,7 +128,7 @@ export default {
                             <td>{{ user.uname }}</td>
                             <td>{{ user.status }}</td>
                             <td>
-                              <button class="btn btn-info btn-sm" @click="viewUserActivity(user)">View Activity</button>
+                                                            <button class="btn btn-secondary btn-sm" @click="viewUserActivity(user)">View Activity</button>
                             </td>
                           </tr>
                         </tbody>
@@ -141,7 +147,7 @@ export default {
             <!-- User Action Buttons to switch views -->
              <div class="d-grid gap-2 d-md-flex justify-content-md-start mb-4">
                 <button class="btn btn-primary" @click="showView = 'book_parking'">Book Parking & Reservations</button>
-                <button class="btn btn-info" @click="showView = 'user_stats'; fetchUserStats();">View My Stats</button>
+                     <button class="btn btn-secondary" @click="showView = 'user_stats'; fetchUserStats();">View My Stats</button>
             </div>
 
             <!-- View: Booking and Reservations Table -->
@@ -171,9 +177,11 @@ export default {
                         <td>{{ res.release_timestamp ? toIST(res.release_timestamp) : '-' }}</td>
                         <td>₹{{ res.parking_cost ? res.parking_cost.toFixed(2) : 'N/A' }}</td>
                         <td>
-                          <button v-if="res.status === 'Active'" class="btn btn-warning btn-sm" @click="openVacateModal(res)">Vacate Spot</button>
-                          <button v-if="res.status === 'Needs Payment'" class="btn btn-success btn-sm" @click="payNow(res.reservation_id)">Pay Now</button>
-                          <span v-if="res.status === 'Paid'" class="text-muted fst-italic">Payment Complete</span>
+                                                                <div class="d-flex flex-wrap gap-2 align-items-center">
+                                                                        <button v-if="res.status === 'Active'" class="btn btn-warning btn-sm" @click="openVacateModal(res)">Vacate Spot</button>
+                                                                        <button v-if="res.status === 'Needs Payment'" class="btn btn-success btn-sm" @click="payNow(res.reservation_id)">Pay Now</button>
+                                                                        <span v-if="res.status === 'Paid'" class="text-muted fst-italic">Payment Complete</span>
+                                                                </div>
                         </td>
                       </tr>
                     </tbody>
@@ -191,20 +199,22 @@ export default {
                             <td>₹{{ lot.price.toFixed(2) }}</td>
                             <td>{{ lot.available_spots }}</td>
                             <td>
-                                <button class="btn btn-success" :disabled="lot.available_spots === 0 || hasActiveBooking" @click="openBookingModal(lot.id)">
-                                    Book Now
-                                </button>
-                                <button class="btn btn-info ms-2" @click="showLotDetails(lot)">Details</button>
+                                <div class="d-flex flex-wrap gap-2">
+                                    <button class="btn btn-success btn-sm" :disabled="lot.available_spots === 0 || hasActiveBooking" @click="openBookingModal(lot.id)">
+                                        Book Now
+                                    </button>
+                                    <button class="btn btn-secondary btn-sm" @click="showLotDetails(lot)">Details</button>
+                                </div>
                             </td>
                         </tr>
                     </tbody>
                 </table>
             </div>
             
-            <div v-if="selectedLot" class="card mt-3">
+            <div v-if="selectedLot && showView === 'book_parking'" class="card mt-3">
                 <div class="card-header">
                     <strong>Parking Lot Details</strong>
-                    <button type="button" class="btn-close float-end" aria-label="Close" @click="selectedLot = null"></button>
+                    <button type="button" class="btn-close float-end" aria-label="Close" @click="hideLotDetails"></button>
                 </div>
                 <div class="card-body">
                     <p><strong>Location:</strong> {{ selectedLot.location }}</p>
@@ -395,6 +405,7 @@ export default {
             csvExporting: false,
             csvTaskId: null,
             csvPollInterval: null,
+            lotDetailsTimer: null,
         };
     },
     computed: {
@@ -428,14 +439,17 @@ export default {
             } catch (error) { console.error("Failed to fetch lots:", error); }
         },
         showAddForm() {
+            this.hideLotDetails();
             this.newLot = { location: '', price: 0, address: '', pin: '', spots: 0 };
             this.showView = 'add_lot';
         },
         showEditForm(lot) {
+            this.hideLotDetails();
             this.editLotData = { ...lot };
             this.showView = 'edit_lot';
         },
         cancelForm() {
+            this.hideLotDetails();
             this.showView = 'view_lots';
             this.editLotData = null; 
         },
@@ -587,8 +601,22 @@ export default {
             const date = new Date(isoString);
             return date.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
         },
+        hideLotDetails() {
+            this.selectedLot = null;
+            if (this.lotDetailsTimer) {
+                clearTimeout(this.lotDetailsTimer);
+                this.lotDetailsTimer = null;
+            }
+        },
         showLotDetails(lot) {
             this.selectedLot = lot;
+            if (this.lotDetailsTimer) {
+                clearTimeout(this.lotDetailsTimer);
+            }
+            this.lotDetailsTimer = setTimeout(() => {
+                this.selectedLot = null;
+                this.lotDetailsTimer = null;
+            }, 60000);
         },
         async fetchAdminStats() {
 
@@ -755,5 +783,11 @@ export default {
             this.showView = 'book_parking';
         }
         this.loading = false;
+    },
+    beforeUnmount() {
+        if (this.lotDetailsTimer) {
+            clearTimeout(this.lotDetailsTimer);
+            this.lotDetailsTimer = null;
+        }
     }
 }
