@@ -18,6 +18,7 @@ This full-stack application provides a complete parking management solution with
 
 ### Admin Features
 - **Parking Lot Management**: Create, update, and delete parking lot locations
+- **Occupied Lot Protection**: Prevent lot edit/delete operations while vehicles are actively parked
 - **Real-time Monitoring**: Track parking occupancy across all lots
 - **User Management**: View and manage registered users
 - **Spot Management**: Configure and manage individual parking spots
@@ -165,23 +166,63 @@ vehicle-parking-app/
 - `POST /api/register` - User registration
 
 ### Parking Lots (Admin)
-- `GET /api/parking-lots` - List all parking lots
-- `POST /api/parking-lots` - Create parking lot
-- `PUT /api/parking-lots/<id>` - Update parking lot
-- `DELETE /api/parking-lots/<id>` - Delete parking lot
+- `GET /api/admin/parking-lots` - List all parking lots
+- `POST /api/admin/parking-lots` - Create parking lot
+- `PUT /api/admin/parking-lots/<lot_id>` - Update parking lot
+- `DELETE /api/admin/parking-lots/<lot_id>` - Delete parking lot
+- `GET /api/admin/parking-lots/<lot_id>/spots` - View spots in a parking lot
 
-### Reservations
-- `GET /api/reservations` - User's reservations
-- `POST /api/reservations` - Create reservation
-- `PUT /api/reservations/<id>` - Update reservation
-- `DELETE /api/reservations/<id>` - Cancel reservation
+### User Parking Flow
+- `GET /api/user/parking-lots` - List available parking lots
+- `POST /api/user/reserve-parking` - Reserve a parking spot
+- `POST /api/user/vacate-parking` - Vacate active reservation and calculate final cost
+- `GET /api/user/reservations` - List user reservations
 
 ### Payments
-- `GET /api/payments` - Payment history
-- `POST /api/payments` - Process payment
+- `POST /api/user/payment/<reservation_id>` - Pay for a completed reservation
 
-### Reports (Admin)
-- `GET /api/reports/activity` - Generate activity report
+### Reports and Analytics
+- `GET /api/user/reports` - User monthly activity summary
+- `GET /api/user/reports-lotwise` - User monthly lot-wise spending and reservations
+- `GET /api/admin/summary` - Admin occupancy summary
+- `GET /api/admin/revenue-summary` - Admin revenue by lot
+- `GET /api/admin/users` - List all registered user accounts
+- `GET /api/admin/user/<user_id>/activity` - User activity report (admin view)
+
+### CSV Export
+- `GET /api/export` - Trigger async CSV generation (admin only)
+- `GET /api/csv_result/<task_id>` - Download generated CSV file (admin only)
+
+## ☁️ Deployment (Render-Friendly)
+
+For presentation/demo use, Render is the easiest platform for this stack.
+
+### Recommended Service Split
+- **Web Service**: Flask app (serves API + frontend)
+- **Worker Service**: Celery worker
+- **Optional Worker Service**: Celery beat scheduler
+- **Redis**: Upstash Redis free tier (broker/cache)
+- **Database**: For demo, SQLite works with caveats; for reliability, use Postgres (Neon/Supabase free tier)
+
+### Why Render is a Good Fit
+- Easy Python deployment from GitHub
+- Supports multiple services in one project (web + worker)
+- Good enough free tier for a live demo showcase
+- Minimal infrastructure setup compared to VPS/manual Docker hosting
+
+### Free Tier Caveats (Important)
+- Services may sleep on inactivity (cold starts)
+- Limited compute/runtime compared to paid plans
+- Do not depend on local ephemeral disk for important production data
+- Prefer managed Postgres over SQLite for persistent hosted deployments
+
+### Minimum Production Env Vars
+- `SECRET_KEY`
+- `SECURITY_PASSWORD_SALT`
+- `REDIS_URL`
+- `CELERY_BROKER_URL`
+- `CELERY_RESULT_BACKEND`
+- `SQLALCHEMY_DATABASE_URI` (if moving to Postgres)
 
 ## 📧 Scheduled Tasks
 
